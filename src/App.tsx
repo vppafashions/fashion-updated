@@ -206,7 +206,7 @@ function StudioApp() {
   const [selectedStyle, setSelectedStyle] = useState(BACKGROUND_STYLES[0]);
   const [selectedGender, setSelectedGender] = useState<Gender>('women');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [uploadMode, setUploadMode] = useState<UploadMode>('standard');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addPhotoInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -632,88 +632,83 @@ Also provide a one-sentence product description.`,
 
       <main className="max-w-[1400px] mx-auto px-6 pt-8 pb-20">
         {/* Top Bar: Upload + Style + Generate */}
+        {/* Two Upload Sections */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          {/* Standard Upload */}
+          <div className="glass rounded-2xl p-5">
+            <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-3 block">
+              Standard Upload
+            </label>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isGenerating}
+              className="w-full py-8 rounded-xl border border-dashed border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all duration-300 flex flex-col items-center justify-center gap-2 group disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-indigo-50 flex items-center justify-center transition-all">
+                <Plus className="w-5 h-5 text-gray-300 group-hover:text-indigo-500 transition-colors" />
+              </div>
+              <p className="text-sm text-gray-500 group-hover:text-gray-700 font-medium transition-colors">New Apparel Item</p>
+              <p className="text-[10px] text-gray-300">Select 1-5 photos of the same product</p>
+            </button>
+          </div>
+
+          {/* Printed Shirt Upload */}
+          <div className="glass rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">
+                Printed / Graphic Shirt
+              </label>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-500 font-medium">Front + Back</span>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => printedFrontRef.current?.click()}
+                disabled={isGenerating || !!pendingPrintedFront}
+                className="flex-1 py-8 rounded-xl border border-dashed border-gray-200 hover:border-violet-300 hover:bg-violet-50/50 transition-all duration-300 flex flex-col items-center justify-center gap-2 group disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {pendingPrintedFront ? (
+                  <>
+                    <img src={pendingPrintedFront.preview} alt="Front" className="w-14 h-14 rounded-lg object-cover border border-gray-200" />
+                    <span className="text-[10px] text-emerald-500 font-medium">Front ready</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-8 h-8 rounded-lg bg-gray-50 group-hover:bg-violet-50 flex items-center justify-center transition-all">
+                      <Upload className="w-4 h-4 text-gray-300 group-hover:text-violet-500 transition-colors" />
+                    </div>
+                    <span className="text-[10px] text-gray-400 font-medium">1. Front View</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => pendingPrintedFront && printedBackRef.current?.click()}
+                disabled={isGenerating || !pendingPrintedFront}
+                className="flex-1 py-8 rounded-xl border border-dashed border-gray-200 hover:border-violet-300 hover:bg-violet-50/50 transition-all duration-300 flex flex-col items-center justify-center gap-2 group disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <div className="w-8 h-8 rounded-lg bg-gray-50 group-hover:bg-violet-50 flex items-center justify-center transition-all">
+                  <Upload className="w-4 h-4 text-gray-300 group-hover:text-violet-500 transition-colors" />
+                </div>
+                <span className="text-[10px] text-gray-400 font-medium">2. Back View</span>
+              </button>
+            </div>
+            {pendingPrintedFront && (
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                <span className="text-[10px] text-gray-400">Front uploaded. Now select the back view.</span>
+                <button onClick={() => setPendingPrintedFront(null)} className="text-[10px] text-red-400 hover:text-red-500">Cancel</button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Settings Bar */}
         <div className="glass rounded-2xl p-5 mb-8">
           <div className="flex flex-col lg:flex-row gap-5 items-start lg:items-end">
-            {/* Upload */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">
-                  Upload References
-                </label>
-                <div className="flex rounded-md border border-gray-200 overflow-hidden">
-                  <button
-                    onClick={() => setUploadMode('standard')}
-                    className={`px-3 py-1 text-[10px] font-medium transition-all ${
-                      uploadMode === 'standard' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-400 hover:text-gray-600'
-                    }`}
-                  >
-                    Standard
-                  </button>
-                  <button
-                    onClick={() => setUploadMode('printed')}
-                    className={`px-3 py-1 text-[10px] font-medium transition-all ${
-                      uploadMode === 'printed' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-400 hover:text-gray-600'
-                    }`}
-                  >
-                    Printed Shirt
-                  </button>
-                </div>
-              </div>
-              {uploadMode === 'standard' ? (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isGenerating}
-                  className="w-full py-6 rounded-xl border border-dashed border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all duration-300 flex items-center justify-center gap-3 group disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-indigo-50 flex items-center justify-center transition-all">
-                    <Plus className="w-5 h-5 text-gray-300 group-hover:text-indigo-500 transition-colors" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm text-gray-500 group-hover:text-gray-700 font-medium transition-colors">New Apparel Item</p>
-                    <p className="text-[10px] text-gray-300">Select 1-5 photos of the same garment</p>
-                  </div>
-                </button>
-              ) : (
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => printedFrontRef.current?.click()}
-                    disabled={isGenerating || !!pendingPrintedFront}
-                    className="flex-1 py-6 rounded-xl border border-dashed border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all duration-300 flex flex-col items-center justify-center gap-2 group disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {pendingPrintedFront ? (
-                      <>
-                        <img src={pendingPrintedFront.preview} alt="Front" className="w-12 h-12 rounded-lg object-cover" />
-                        <span className="text-[10px] text-emerald-500 font-medium">Front uploaded</span>
-                      </>
-                    ) : (
-                      <>
-                        <div className="w-8 h-8 rounded-lg bg-gray-50 group-hover:bg-indigo-50 flex items-center justify-center transition-all">
-                          <Plus className="w-4 h-4 text-gray-300 group-hover:text-indigo-500 transition-colors" />
-                        </div>
-                        <span className="text-[10px] text-gray-400 font-medium">Front View</span>
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => pendingPrintedFront && printedBackRef.current?.click()}
-                    disabled={isGenerating || !pendingPrintedFront}
-                    className="flex-1 py-6 rounded-xl border border-dashed border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all duration-300 flex flex-col items-center justify-center gap-2 group disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-gray-50 group-hover:bg-indigo-50 flex items-center justify-center transition-all">
-                      <Plus className="w-4 h-4 text-gray-300 group-hover:text-indigo-500 transition-colors" />
-                    </div>
-                    <span className="text-[10px] text-gray-400 font-medium">Back View</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
             {/* Style Selector */}
-            <div className="lg:w-[340px]">
+            <div className="flex-1">
               <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-3 block">
                 Studio Backdrop
               </label>
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
                 {BACKGROUND_STYLES.map((style) => (
                   <button
                     key={style.id}
