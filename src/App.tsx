@@ -41,29 +41,152 @@ interface ApparelItem {
   campaignProgress?: { current: number; total: number };
 }
 
-interface CampaignProp {
+interface CampaignScene {
   id: string;
   label: string;
-  prompt: string;
+  mood: string;
+  sceneDescription: string;
+  heroElement: string;
   interaction: string;
+  supportingElements: string;
 }
 
-const CAMPAIGN_PROPS: CampaignProp[] = [
-  { id: 'shopping-bag', label: 'Shopping Bag', prompt: 'a massive oversized luxury paper shopping bag with rope handles, rectangular body, sharp folded edges', interaction: 'model grips the rope handles, bag held in front of body or swung to one side' },
-  { id: 'sneaker', label: 'Giant Sneaker', prompt: 'an enormous sneaker/trainer shown in full side profile, prominent laces, chunky sole, athletic silhouette', interaction: 'model stands on top of the giant sneaker or leans against it, one foot planted on the sole' },
-  { id: 'sunglasses', label: 'Sunglasses', prompt: 'massive oversized aviator or wayfarer sunglasses with two lenses and a bridge, thick frames', interaction: 'model holds the giant sunglasses up to their own face, looking through one lens' },
-  { id: 'boombox', label: 'Boombox', prompt: 'a massive 80s style boombox with two large round speakers, cassette deck center, carrying handle on top, antenna', interaction: 'model carries the boombox on one shoulder, hand gripping the top handle' },
-  { id: 'handbag', label: 'Handbag', prompt: 'a monumentally oversized luxury handbag with a long shoulder chain strap, rectangular body, clasp detail', interaction: 'model slings the chain strap over one shoulder, bag hanging at hip level' },
-  { id: 'perfume', label: 'Perfume Bottle', prompt: 'a giant rectangular glass-style perfume bottle with a prominent cap, elegant proportions', interaction: 'model embraces the perfume bottle from the side, one arm wrapped around it' },
-  { id: 'magazine', label: 'Magazine', prompt: 'a giant open fashion magazine held in mid-air, spread showing two pages, curved paper edges', interaction: 'model holds the open magazine in front of them with both hands, reading it' },
-  { id: 'polaroid', label: 'Polaroid Camera', prompt: 'an oversized polaroid instant camera, boxy rectangular shape with round lens, flash, and a photo emerging from the slot', interaction: 'model holds the polaroid camera up to their eye, one finger on the shutter button' },
-  { id: 'skateboard', label: 'Skateboard', prompt: 'an oversized skateboard shown from the side/angle with visible wheels and deck, trucks exposed', interaction: 'model stands on top of the skateboard with both feet, arms balanced' },
-  { id: 'coffee-cup', label: 'Coffee Cup', prompt: 'an oversized takeaway coffee cup with a domed lid, corrugated cardboard sleeve, steam curls rising from the lid', interaction: 'model holds the giant coffee cup with both hands at chest height' },
-  { id: 'umbrella', label: 'Umbrella', prompt: 'a massive open umbrella from a side/three-quarter angle, canopy with visible panels, curved handle extending downward', interaction: 'model holds the umbrella handle, canopy opened above and behind them' },
-  { id: 'vinyl', label: 'Vinyl Record', prompt: 'a giant vinyl record with its sleeve partially slid out, circular record with center label and radial grooves', interaction: 'model balances the vinyl record on one fingertip or holds it up like a prize' },
-  { id: 'cassette', label: 'Cassette Tape', prompt: 'a giant retro cassette tape, two circular reels visible through the plastic window, label area in center', interaction: 'model holds the giant cassette tape flat against their chest' },
-  { id: 'cap', label: 'Baseball Cap', prompt: 'a huge baseball cap/snapback shown from the side, curved brim, panel structure, adjustable strap', interaction: 'model leans against the giant cap, one arm draped over the brim' },
-  { id: 'phone', label: 'Retro Phone', prompt: 'a giant retro corded telephone handset with a coiled cord, rounded ergonomic shape', interaction: 'model holds the giant phone handset up to their ear with both hands' },
+const CAMPAIGN_SCENES: CampaignScene[] = [
+  {
+    id: 'street-hustle',
+    label: 'Street Hustle',
+    mood: 'Urban, gritty, confident',
+    sceneDescription: 'raw urban street energy, graffiti culture, skate subculture',
+    heroElement: 'an oversized skateboard shown from the side with visible wheels, deck, and trucks',
+    interaction: 'model stands on top of the skateboard, one foot on the deck, posed mid-kickflip stance',
+    supportingElements: 'graffiti-style tag marks, spray paint drips, concrete crack lines, small illustrated traffic cone'
+  },
+  {
+    id: 'summer-heat',
+    label: 'Summer Heat',
+    mood: 'Sun-soaked, breezy, vacation',
+    sceneDescription: 'tropical summer vibes, beach club energy, sunshine and salt air',
+    heroElement: 'a massive beach umbrella with visible panels and a curved handle, or oversized sunglasses',
+    interaction: 'model holds the umbrella handle with canopy tilted behind them, or wears giant sunglasses held up to face',
+    supportingElements: 'palm frond silhouettes, small sun rays, wave swirls at ground, a tiny cocktail glass illustration'
+  },
+  {
+    id: 'neon-nightlife',
+    label: 'Neon Nightlife',
+    mood: 'Electric, bold, after-dark',
+    sceneDescription: 'nightclub energy, disco sparkle, dance floor drama',
+    heroElement: 'an oversized disco ball with visible facets, or a giant cocktail glass with olive',
+    interaction: 'model reaches up to touch the disco ball, or toasts the giant cocktail glass upward',
+    supportingElements: 'sparkle bursts, light beam lines radiating outward, musical note marks, zigzag dance energy lines'
+  },
+  {
+    id: 'retro-y2k',
+    label: 'Retro Y2K',
+    mood: 'Nostalgic, playful, 2000s throwback',
+    sceneDescription: 'early 2000s pop energy, CD players, bubble tech, butterfly clips',
+    heroElement: 'a massive 80s-90s boombox with twin speakers, cassette deck, antenna, and carrying handle',
+    interaction: 'model carries the boombox on one shoulder, hand gripping the top handle, head tilted to the side',
+    supportingElements: 'butterfly silhouettes, star bursts, swirl lines, a tiny flip phone illustration'
+  },
+  {
+    id: 'studio-editorial',
+    label: 'Studio Editorial',
+    mood: 'Minimal, luxurious, high-fashion',
+    sceneDescription: 'clean high-fashion editorial, Vogue cover energy, quiet luxury',
+    heroElement: 'a giant open fashion magazine held mid-air with visible page spread, or an oversized luxury handbag with chain strap',
+    interaction: 'model holds the open magazine in front of them reading, or slings the handbag chain over one shoulder',
+    supportingElements: 'elegant thin squiggles, small star accents, minimal dash clusters, a tiny lipstick illustration'
+  },
+  {
+    id: 'travel-wanderlust',
+    label: 'Travel Wanderlust',
+    mood: 'Wander, explore, airport-ready',
+    sceneDescription: 'jetsetter vibes, airport runway, passport stamps and tickets',
+    heroElement: 'a massive vintage hard-shell suitcase with clasps, stickers, and a carrying handle',
+    interaction: 'model sits on top of the suitcase with legs crossed, or pulls it by the handle mid-stride',
+    supportingElements: 'airplane silhouette, cloud puffs, tiny boarding pass illustration, dashed flight path lines'
+  },
+  {
+    id: 'rooftop-sunset',
+    label: 'Rooftop Sunset',
+    mood: 'Golden hour, romantic, elevated',
+    sceneDescription: 'rooftop golden hour energy, city skyline, champagne toast',
+    heroElement: 'a giant champagne bottle with foil neck, or an oversized string-light bulb',
+    interaction: 'model pops the cork of the champagne bottle above their head, or cradles the giant bulb',
+    supportingElements: 'tiny city skyline outline at bottom, string light dashes, small star sparkles, fizz bubbles'
+  },
+  {
+    id: 'sport-mode',
+    label: 'Sport Mode',
+    mood: 'Athletic, energetic, performance',
+    sceneDescription: 'athletic performance energy, stadium tunnel vibe, training drive',
+    heroElement: 'an enormous sneaker/trainer in side profile with prominent laces and chunky sole, or a giant basketball',
+    interaction: 'model stands on top of the giant sneaker mid-lunge, or dribbles the oversized basketball beside them',
+    supportingElements: 'speed dashes radiating outward, small motion-track arrows, sweat drop marks, tiny whistle illustration'
+  },
+  {
+    id: 'cafe-chic',
+    label: 'Cafe Chic',
+    mood: 'Cozy, intellectual, morning light',
+    sceneDescription: 'parisian cafe morning, newspaper-and-coffee intellectual energy',
+    heroElement: 'an oversized takeaway coffee cup with domed lid, sleeve, and rising steam curls, or a giant open newspaper',
+    interaction: 'model holds the giant coffee cup with both hands at chest height, or peeks over the top of the open newspaper',
+    supportingElements: 'steam swirls, tiny croissant illustration, small saucer marks, subtle bistro chair outline'
+  },
+  {
+    id: 'arcade-retro',
+    label: 'Arcade Retro',
+    mood: 'Playful, neon, 80s arcade',
+    sceneDescription: 'neon arcade energy, joystick action, pixel nostalgia',
+    heroElement: 'an oversized retro joystick with round ball top and base, or a giant CRT tv with visible screen and dials',
+    interaction: 'model grips the giant joystick top with both hands mid-push, or leans against the CRT tv casually',
+    supportingElements: 'small pixel block clusters, lightning bolt zaps, tiny coin illustration, zigzag energy dashes'
+  },
+  {
+    id: 'gallery-art',
+    label: 'Gallery Art',
+    mood: 'Cultured, curated, museum quiet',
+    sceneDescription: 'modern art gallery opening night, sculpted minimalism',
+    heroElement: 'a giant picture frame (empty square frame, thick border), or an oversized sculpture pedestal',
+    interaction: 'model poses inside the empty picture frame as if they are the artwork, or stands on top of the pedestal',
+    supportingElements: 'tiny wine glass illustration, small paint splatter, minimal geometric dot cluster, thin plaque lines'
+  },
+  {
+    id: 'garden-bloom',
+    label: 'Garden Bloom',
+    mood: 'Romantic, fresh, floral',
+    sceneDescription: 'bloom garden romance, botanical soft energy',
+    heroElement: 'a massive bouquet of flowers with visible stems and blooms, or a giant watering can with spout',
+    interaction: 'model embraces the bouquet against their chest, or tilts the giant watering can as if pouring',
+    supportingElements: 'small leaf sprigs, tiny butterfly illustration, water drop marks, curling vine squiggles'
+  },
+  {
+    id: 'festival-rave',
+    label: 'Festival Rave',
+    mood: 'Ecstatic, celebration, crowd',
+    sceneDescription: 'music festival main stage, crowd energy, celebration',
+    heroElement: 'a giant speaker stack with visible cones, or an oversized microphone with cable',
+    interaction: 'model jumps in front of the speaker with fist raised, or grips the giant microphone singing into it',
+    supportingElements: 'confetti bursts, tiny hand-raised silhouettes, sound wave ripples, small lightning bolts'
+  },
+  {
+    id: 'winter-cozy',
+    label: 'Winter Cozy',
+    mood: 'Warm, snowy, layered',
+    sceneDescription: 'snowy winter morning, hot cocoa and wool, ski lodge',
+    heroElement: 'a giant mug of hot cocoa with rising steam and marshmallow, or an oversized snowflake',
+    interaction: 'model cups the giant mug with both hands sipping from it, or catches the giant snowflake on one finger',
+    supportingElements: 'tiny snowflake clusters, small pine tree silhouettes, steam curls, knitted stitch dashes'
+  },
+  {
+    id: 'romantic-date',
+    label: 'Romantic Date',
+    mood: 'Intimate, soft, love-letter',
+    sceneDescription: 'romantic date night, candlelight and roses, paris balcony',
+    heroElement: 'an oversized single long-stem rose, or a giant lit candle with tall flame',
+    interaction: 'model holds the giant rose across their body as if presented, or cups one hand around the flame of the candle',
+    supportingElements: 'tiny heart outlines, small envelope illustration, curling ribbon squiggles, soft spark dots'
+  },
 ];
 
 
@@ -691,13 +814,13 @@ Also provide a one-sentence product description.`,
     setApparelItems(prev => prev.map(i => i.id === itemId ? { ...i, [field]: value } : i));
   };
 
-  const toggleCampaignProp = (itemId: string, propId: string) => {
+  const toggleCampaignScene = (itemId: string, sceneId: string) => {
     setApparelItems(prev => prev.map(i => {
       if (i.id !== itemId) return i;
       const current = i.selectedCampaignObjects || [];
-      const next = current.includes(propId)
-        ? current.filter(p => p !== propId)
-        : [...current, propId];
+      const next = current.includes(sceneId)
+        ? current.filter(s => s !== sceneId)
+        : [...current, sceneId];
       return { ...i, selectedCampaignObjects: next };
     }));
   };
@@ -717,13 +840,13 @@ Also provide a one-sentence product description.`,
 
       for (const item of validTargets) {
         const selectedIds = item.selectedCampaignObjects || [];
-        const propsToGenerate = CAMPAIGN_PROPS.filter(p => selectedIds.includes(p.id));
+        const scenesToGenerate = CAMPAIGN_SCENES.filter(s => selectedIds.includes(s.id));
 
         setApparelItems(prev => prev.map(i => i.id === item.id ? {
           ...i,
           campaignStatus: 'generating',
           campaignImages: [],
-          campaignProgress: { current: 0, total: propsToGenerate.length }
+          campaignProgress: { current: 0, total: scenesToGenerate.length }
         } : i));
 
         const hero = item.heroColor || '#6366f1';
@@ -741,12 +864,12 @@ Also provide a one-sentence product description.`,
 
         const generatedCampaigns: { objectId: string; objectLabel: string; view: GeneratedView }[] = [];
 
-        for (let pi = 0; pi < propsToGenerate.length; pi++) {
-          const prop = propsToGenerate[pi];
+        for (let si = 0; si < scenesToGenerate.length; si++) {
+          const scene = scenesToGenerate[si];
 
           setApparelItems(prev => prev.map(i => i.id === item.id ? {
             ...i,
-            campaignProgress: { current: pi, total: propsToGenerate.length }
+            campaignProgress: { current: si, total: scenesToGenerate.length }
           } : i));
 
           const parts: any[] = imageDataParts.map(img => ({
@@ -757,7 +880,9 @@ Also provide a one-sentence product description.`,
             parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
           }
 
-          const campaignPrompt = `You are a Mixed-Media Campaign Art Director creating a high-impact streetwear campaign for VPPA Fashions. Produce a single 1:1 square mixed-media campaign image combining a real photographic cutout of a model with flat white hand-drawn 2D illustration.
+          const campaignPrompt = `You are a Mixed-Media Campaign Art Director creating a high-impact campaign for VPPA Fashions. Produce a single 1:1 square mixed-media campaign image combining a real photographic cutout of a model with flat white hand-drawn 2D illustration.
+
+SCENE CONCEPT: "${scene.label}" -- ${scene.mood}. Evoke the feeling of ${scene.sceneDescription}.
 
 CANVAS & COLOR SYSTEM:
 - 1:1 square format.
@@ -769,25 +894,29 @@ MODEL (REAL PHOTOGRAPHIC CUTOUT):
 - ${modelDescription}.
 - The model is a clean photographic cutout -- zero fringing, sharp edges.
 - She/he is wearing the EXACT apparel shown in the reference images -- reproduce the garment faithfully in color, cut, prints, and details.
-- Pose is active, caught mid-action. The body position must make the physical interaction with the illustrated object feel natural and real.
+- Pose is active, caught mid-action. The body position and energy must match the "${scene.label}" scene mood.
 
-ILLUSTRATED OBJECT (HAND-DRAWN 2D):
-- Object: ${prop.prompt}.
-- Drawn in pure white (#FFFFFF) only. Flat 2D illustration, brush-pen marker line quality, 3-5px line weight, slightly imperfect organic edges (hand-drawn feel, not vector-perfect). NO shading, NO gradients, flat white fill only.
-- SCALE: the object must be MASSIVE -- at least 40% of canvas height. Monumental oversized scale is encouraged.
-- DEPTH LAYERING is critical: parts of the object sit BEHIND the model, parts come IN FRONT of the model. The model's real hands or feet make contact at the intersection point so the scene reads as integrated, not collaged.
-- INTERACTION: ${prop.interaction}. The relationship must be instantly readable in 2 seconds. Caught mid-action, alive.
+HERO ILLUSTRATED ELEMENT (HAND-DRAWN 2D):
+- Draw: ${scene.heroElement}.
+- Drawn in pure white (#FFFFFF) only. Flat 2D illustration, brush-pen marker line quality, 3-5px line weight, slightly imperfect organic edges (hand-drawn feel). NO shading, NO gradients, flat white fill only.
+- SCALE: this hero element must be MASSIVE -- at least 40% of canvas height. Monumental oversized scale.
+- DEPTH LAYERING is critical: parts of the hero element sit BEHIND the model, parts come IN FRONT of the model. The model's real hands or feet make contact at the intersection point.
+- INTERACTION: ${scene.interaction}. The relationship must be instantly readable in 2 seconds. Caught mid-action, alive.
+
+SCENE-SPECIFIC SUPPORTING ILLUSTRATIONS (all white, flat, brush-pen line style, same visual language):
+- Scatter these scene elements across the composition to build the "${scene.label}" mood: ${scene.supportingElements}.
+- Mix small and medium sizes. Some behind the model, some in front. Keep them loose and hand-drawn.
 
 BRAND STAMP:
-- One small "VPPA" wordmark naturally embedded on the surface of the illustrated object -- as if printed, engraved, or stitched -- rendered in ${heroDark}. Subtle, not dominant.
+- One small "VPPA" wordmark naturally embedded on the surface of the hero illustrated element -- as if printed, engraved, or stitched -- rendered in ${heroDark}. Subtle, not dominant.
 ${logoBase64 ? '- Use the provided VPPA logo for the brand stamp and supporting marks, rendered in flat white line form.' : ''}
 
-SUPPORTING ILLUSTRATION SYSTEM (all white, flat, brush-pen line style, same visual language as the hero object):
+UNIVERSAL SUPPORTING ELEMENTS (always included):
 - A large VPPA logo mark in the upper-left corner, about 15% of canvas width.
 - A medium VPPA mark in the opposite corner, about 10% of canvas width.
-- 2-3 manga-style exclamation dash clusters near the point of contact between the model and the object.
-- 2-4 curved speed/motion lines tapered at the ends, radiating from the object or the model's most active body part; some should cross behind the model and some in front for depth.
-- Ground effect at the base of the scene: sparkle stars, short speed dashes, or object-specific effect (splash if cup, dust clouds if sneaker, wheel tracks if skateboard).
+- 2-3 manga-style exclamation dash clusters near the point of contact between the model and hero element.
+- 2-4 curved speed/motion lines tapered at the ends, radiating from the hero element or the model's most active body part; some cross behind the model and some in front for depth.
+- A ground-line effect at the base of the scene using the scene-specific supporting elements where possible.
 - 1-2 loose organic white squiggles floating near the model's torso for visual rhythm.
 
 LIGHTING ON THE MODEL:
@@ -797,9 +926,9 @@ LIGHTING ON THE MODEL:
 STRICT TECH RULES:
 - Exactly 3 colors in the composition: ${hero} light base, ${heroDark} darker blobs, and pure white illustration. The only additional colors permitted are the model's natural skin tones and the actual fabric colors of the garment.
 - Aesthetic references: Y2K comic energy, Japanese streetwear magazine, brush marker illustration.
-- Asymmetric, dynamic composition. The interaction point between the model and object is the visual center of gravity; everything else orbits around it.
+- Asymmetric, dynamic composition. The interaction point between the model and hero element is the visual center of gravity; everything else orbits around it.
 - NO text. NO wordmarks beyond the small embedded VPPA stamp and logo icons already described. NO watermarks.
-- Mood: the model is not posing WITH the object -- the model is IN THE MIDDLE of using it, caught mid-action.
+- Mood: the model is not posing WITH the element -- the model is IN THE MIDDLE of the "${scene.label}" moment, caught mid-action.
 
 Reproduce the EXACT apparel from the provided reference images on the model. Output one image only.`;
 
@@ -823,9 +952,9 @@ Reproduce the EXACT apparel from the provided reference images on the model. Out
 
             if (url) {
               generatedCampaigns.push({
-                objectId: prop.id,
-                objectLabel: prop.label,
-                view: { url, type: prop.label, description: desc || `VPPA x ${prop.label}` }
+                objectId: scene.id,
+                objectLabel: scene.label,
+                view: { url, type: scene.label, description: desc || `VPPA x ${scene.label}` }
               });
               setApparelItems(prev => prev.map(i => i.id === item.id ? {
                 ...i,
@@ -835,7 +964,7 @@ Reproduce the EXACT apparel from the provided reference images on the model. Out
 
             await sleep(1000);
           } catch (err) {
-            console.error(`Campaign generation failed for ${prop.label}:`, err);
+            console.error(`Campaign generation failed for ${scene.label}:`, err);
           }
         }
 
@@ -1259,7 +1388,7 @@ Reproduce the EXACT apparel from the provided reference images on the model. Out
                     Brand <span className="font-serif italic font-normal text-gray-500">Campaigns</span>
                   </h2>
                 </div>
-                <p className="text-sm text-gray-400">Mixed-media streetwear posters -- real model photography meets hand-drawn 2D illustration</p>
+                <p className="text-sm text-gray-400">Mixed-media campaign scenes -- pick one or many moods, hit generate, and get a poster for every scene</p>
               </div>
               {(() => {
                 const totalSelected = apparelItems.reduce((sum, i) => sum + (i.selectedCampaignObjects?.length || 0), 0);
@@ -1335,13 +1464,13 @@ Reproduce the EXACT apparel from the provided reference images on the model. Out
                       </div>
                     </div>
 
-                    {/* Prop Selection */}
+                    {/* Scene Selection */}
                     <div className="px-5 py-4 border-b border-gray-100">
                       <div className="flex items-center justify-between mb-3">
-                        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Select Props (multiple)</label>
+                        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Select Scenes (multiple)</label>
                         <div className="flex gap-2 text-[10px]">
                           <button
-                            onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedCampaignObjects: CAMPAIGN_PROPS.map(p => p.id) } : i))}
+                            onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedCampaignObjects: CAMPAIGN_SCENES.map(s => s.id) } : i))}
                             className="text-gray-400 hover:text-gray-600"
                           >
                             Select all
@@ -1355,21 +1484,22 @@ Reproduce the EXACT apparel from the provided reference images on the model. Out
                           </button>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {CAMPAIGN_PROPS.map(prop => {
-                          const isSelected = selectedProps.includes(prop.id);
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                        {CAMPAIGN_SCENES.map(scene => {
+                          const isSelected = selectedProps.includes(scene.id);
                           return (
                             <button
-                              key={prop.id}
-                              onClick={() => toggleCampaignProp(item.id, prop.id)}
+                              key={scene.id}
+                              onClick={() => toggleCampaignScene(item.id, scene.id)}
                               disabled={isItemGenerating}
-                              className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 border disabled:opacity-50 ${
+                              className={`px-3 py-2 rounded-lg text-left transition-all duration-200 border disabled:opacity-50 ${
                                 isSelected
                                   ? 'bg-fuchsia-500 text-white border-fuchsia-500 shadow-sm'
-                                  : 'bg-white text-gray-500 border-gray-200 hover:border-fuchsia-200 hover:text-gray-700'
+                                  : 'bg-white text-gray-600 border-gray-200 hover:border-fuchsia-200'
                               }`}
                             >
-                              {prop.label}
+                              <p className="text-[11px] font-semibold truncate">{scene.label}</p>
+                              <p className={`text-[9px] truncate mt-0.5 ${isSelected ? 'text-fuchsia-100' : 'text-gray-400'}`}>{scene.mood}</p>
                             </button>
                           );
                         })}
@@ -1383,29 +1513,29 @@ Reproduce the EXACT apparel from the provided reference images on the model. Out
                           <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center">
                             <Sparkles className="w-5 h-5 text-gray-300" />
                           </div>
-                          <p className="text-xs text-gray-400">Select one or more props, then hit Generate</p>
+                          <p className="text-xs text-gray-400">Select one or more scenes, then hit Generate</p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                           {(() => {
-                            const selectedPropDefs = CAMPAIGN_PROPS.filter(p => selectedProps.includes(p.id));
-                            const total = isItemGenerating && item.campaignProgress ? item.campaignProgress.total : selectedPropDefs.length;
+                            const selectedSceneDefs = CAMPAIGN_SCENES.filter(s => selectedProps.includes(s.id));
+                            const total = isItemGenerating && item.campaignProgress ? item.campaignProgress.total : selectedSceneDefs.length;
                             const currentIdx = item.campaignProgress?.current ?? -1;
-                            return selectedPropDefs.slice(0, Math.max(total, campaignImages.length)).map((prop, idx) => {
-                              const generated = campaignImages.find(c => c.objectId === prop.id);
+                            return selectedSceneDefs.slice(0, Math.max(total, campaignImages.length)).map((scene, idx) => {
+                              const generated = campaignImages.find(c => c.objectId === scene.id);
                               const isCurrent = isItemGenerating && idx === currentIdx;
                               const isWaiting = isItemGenerating && idx > currentIdx && !generated;
                               return (
-                                <div key={prop.id} className="group">
+                                <div key={scene.id} className="group">
                                   <div className={`aspect-square rounded-xl overflow-hidden relative border transition-all ${
                                     generated ? 'border-gray-200 hover:border-gray-300' : 'border-gray-100 bg-gray-50/50'
                                   } ${isCurrent ? 'ring-1 ring-fuchsia-300' : ''}`}>
                                     {generated ? (
                                       <>
-                                        <img src={generated.view.url} alt={prop.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <img src={generated.view.url} alt={scene.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
                                           <button
-                                            onClick={() => downloadImage(generated.view.url, `VPPA_Campaign_${prop.id}_${item.id}.png`)}
+                                            onClick={() => downloadImage(generated.view.url, `VPPA_Campaign_${scene.id}_${item.id}.png`)}
                                             className="w-full py-1.5 rounded-lg bg-white text-gray-700 text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 shadow-sm"
                                           >
                                             <Download className="w-3 h-3" />
@@ -1435,7 +1565,7 @@ Reproduce the EXACT apparel from the provided reference images on the model. Out
                                   <p className={`text-[10px] mt-1.5 text-center font-medium truncate ${
                                     generated ? 'text-gray-500' : isCurrent ? 'text-fuchsia-500' : 'text-gray-300'
                                   }`}>
-                                    {prop.label}
+                                    {scene.label}
                                   </p>
                                 </div>
                               );
