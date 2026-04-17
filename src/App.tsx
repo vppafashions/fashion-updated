@@ -35,10 +35,36 @@ interface ApparelItem {
   generatedStyleId?: string;
   uploadMode: UploadMode;
   heroColor?: string;
-  campaignObject?: string;
-  campaignImage?: GeneratedView;
+  selectedCampaignObjects?: string[];
+  campaignImages?: { objectId: string; objectLabel: string; view: GeneratedView }[];
   campaignStatus?: 'idle' | 'generating' | 'completed' | 'error';
+  campaignProgress?: { current: number; total: number };
 }
+
+interface CampaignProp {
+  id: string;
+  label: string;
+  prompt: string;
+  interaction: string;
+}
+
+const CAMPAIGN_PROPS: CampaignProp[] = [
+  { id: 'shopping-bag', label: 'Shopping Bag', prompt: 'a massive oversized luxury paper shopping bag with rope handles, rectangular body, sharp folded edges', interaction: 'model grips the rope handles, bag held in front of body or swung to one side' },
+  { id: 'sneaker', label: 'Giant Sneaker', prompt: 'an enormous sneaker/trainer shown in full side profile, prominent laces, chunky sole, athletic silhouette', interaction: 'model stands on top of the giant sneaker or leans against it, one foot planted on the sole' },
+  { id: 'sunglasses', label: 'Sunglasses', prompt: 'massive oversized aviator or wayfarer sunglasses with two lenses and a bridge, thick frames', interaction: 'model holds the giant sunglasses up to their own face, looking through one lens' },
+  { id: 'boombox', label: 'Boombox', prompt: 'a massive 80s style boombox with two large round speakers, cassette deck center, carrying handle on top, antenna', interaction: 'model carries the boombox on one shoulder, hand gripping the top handle' },
+  { id: 'handbag', label: 'Handbag', prompt: 'a monumentally oversized luxury handbag with a long shoulder chain strap, rectangular body, clasp detail', interaction: 'model slings the chain strap over one shoulder, bag hanging at hip level' },
+  { id: 'perfume', label: 'Perfume Bottle', prompt: 'a giant rectangular glass-style perfume bottle with a prominent cap, elegant proportions', interaction: 'model embraces the perfume bottle from the side, one arm wrapped around it' },
+  { id: 'magazine', label: 'Magazine', prompt: 'a giant open fashion magazine held in mid-air, spread showing two pages, curved paper edges', interaction: 'model holds the open magazine in front of them with both hands, reading it' },
+  { id: 'polaroid', label: 'Polaroid Camera', prompt: 'an oversized polaroid instant camera, boxy rectangular shape with round lens, flash, and a photo emerging from the slot', interaction: 'model holds the polaroid camera up to their eye, one finger on the shutter button' },
+  { id: 'skateboard', label: 'Skateboard', prompt: 'an oversized skateboard shown from the side/angle with visible wheels and deck, trucks exposed', interaction: 'model stands on top of the skateboard with both feet, arms balanced' },
+  { id: 'coffee-cup', label: 'Coffee Cup', prompt: 'an oversized takeaway coffee cup with a domed lid, corrugated cardboard sleeve, steam curls rising from the lid', interaction: 'model holds the giant coffee cup with both hands at chest height' },
+  { id: 'umbrella', label: 'Umbrella', prompt: 'a massive open umbrella from a side/three-quarter angle, canopy with visible panels, curved handle extending downward', interaction: 'model holds the umbrella handle, canopy opened above and behind them' },
+  { id: 'vinyl', label: 'Vinyl Record', prompt: 'a giant vinyl record with its sleeve partially slid out, circular record with center label and radial grooves', interaction: 'model balances the vinyl record on one fingertip or holds it up like a prize' },
+  { id: 'cassette', label: 'Cassette Tape', prompt: 'a giant retro cassette tape, two circular reels visible through the plastic window, label area in center', interaction: 'model holds the giant cassette tape flat against their chest' },
+  { id: 'cap', label: 'Baseball Cap', prompt: 'a huge baseball cap/snapback shown from the side, curved brim, panel structure, adjustable strap', interaction: 'model leans against the giant cap, one arm draped over the brim' },
+  { id: 'phone', label: 'Retro Phone', prompt: 'a giant retro corded telephone handset with a coiled cord, rounded ergonomic shape', interaction: 'model holds the giant phone handset up to their ear with both hands' },
+];
 
 
 
@@ -665,53 +691,23 @@ Also provide a one-sentence product description.`,
     setApparelItems(prev => prev.map(i => i.id === itemId ? { ...i, [field]: value } : i));
   };
 
-  const pickCampaignObject = async (imageDataParts: { data: string; mimeType: string }[], gender: Gender): Promise<{ object: string; interaction: string }> => {
-    const parts: any[] = imageDataParts.map(img => ({
-      inlineData: { data: img.data, mimeType: img.mimeType }
+  const toggleCampaignProp = (itemId: string, propId: string) => {
+    setApparelItems(prev => prev.map(i => {
+      if (i.id !== itemId) return i;
+      const current = i.selectedCampaignObjects || [];
+      const next = current.includes(propId)
+        ? current.filter(p => p !== propId)
+        : [...current, propId];
+      return { ...i, selectedCampaignObjects: next };
     }));
-
-    parts.push({
-      text: `You are a streetwear campaign art director for VPPA Fashions (an apparel brand for men and women).
-
-Look at this garment in the reference images. You need to pick ONE iconic, large, tangible fashion/lifestyle object that will be illustrated in flat white brush-pen 2D style next to a real model wearing this apparel.
-
-Rules for picking the object:
-1. It must PAIR visually and culturally with this type of garment (e.g., streetwear tee -> boombox/skateboard/sneaker; summer dress -> beach umbrella/surfboard/shopping bag; formal -> luxury handbag/perfume bottle/polaroid; hoodie -> vintage camera/record player)
-2. It must be LARGE enough for a human to interact with at full scale
-3. It must allow a clear, physical, mid-action interaction (holding, riding, leaning against, standing on, emerging from)
-4. NO animals. NO logos. NO another piece of clothing. Pick a real tangible object.
-5. The model is a ${gender === 'women' ? 'young woman' : 'young man'} - pick something that matches their energy.
-
-Respond in EXACTLY this format (no extra text, no markdown):
-OBJECT: [one line describing the physical object in detail, e.g. "a massive 80s boombox with two large round speakers, cassette deck in the center, carrying handle, antenna"]
-INTERACTION: [one line describing how the model physically interacts with it, e.g. "model carries the boombox on their shoulder, one hand gripping the top handle"]`
-    });
-
-    try {
-      const response = await genAI.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: { parts }
-      });
-      const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      const objectMatch = text.match(/OBJECT:\s*(.+)/i);
-      const interactionMatch = text.match(/INTERACTION:\s*(.+)/i);
-      return {
-        object: objectMatch?.[1]?.trim() || 'an oversized luxury shopping bag with rope handles',
-        interaction: interactionMatch?.[1]?.trim() || 'model holds the bag by its handles in front of their body'
-      };
-    } catch {
-      return {
-        object: 'an oversized luxury shopping bag with rope handles',
-        interaction: 'model holds the bag by its handles in front of their body'
-      };
-    }
   };
 
   const generateCampaigns = async (targetItemId?: string) => {
     const targets = targetItemId
       ? apparelItems.filter(i => i.id === targetItemId)
       : apparelItems;
-    if (targets.length === 0) return;
+    const validTargets = targets.filter(i => (i.selectedCampaignObjects || []).length > 0);
+    if (validTargets.length === 0) return;
 
     setIsGeneratingCampaigns(true);
     const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -719,8 +715,16 @@ INTERACTION: [one line describing how the model physically interacts with it, e.
     try {
       const logoBase64 = logo ? await fileToBase64(logo.file) : null;
 
-      for (const item of targets) {
-        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, campaignStatus: 'generating' } : i));
+      for (const item of validTargets) {
+        const selectedIds = item.selectedCampaignObjects || [];
+        const propsToGenerate = CAMPAIGN_PROPS.filter(p => selectedIds.includes(p.id));
+
+        setApparelItems(prev => prev.map(i => i.id === item.id ? {
+          ...i,
+          campaignStatus: 'generating',
+          campaignImages: [],
+          campaignProgress: { current: 0, total: propsToGenerate.length }
+        } : i));
 
         const hero = item.heroColor || '#6366f1';
         const heroDark = darkenHex(hero, 20);
@@ -731,24 +735,29 @@ INTERACTION: [one line describing how the model physically interacts with it, e.
           imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
         }
 
-        // Step 1: AI autonomously picks the best fashion object + interaction for this garment
-        const { object: pickedObject, interaction: pickedInteraction } = await pickCampaignObject(imageDataParts, selectedGender);
-
-        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, campaignObject: pickedObject } : i));
-
-        const parts: any[] = imageDataParts.map(img => ({
-          inlineData: { data: img.data, mimeType: img.mimeType }
-        }));
-
-        if (logoBase64) {
-          parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
-        }
-
         const modelDescription = selectedGender === 'women'
           ? "a single young Indian woman, age 20-26, elegant features, medium-brown skin, styled dark hair, confident expression"
           : "a single young Indian man, age 20-26, sharp features, medium-brown skin, well-groomed hair, confident expression";
 
-        const campaignPrompt = `You are a Mixed-Media Campaign Art Director creating a high-impact streetwear campaign for VPPA Fashions. Produce a single 1:1 square mixed-media campaign image combining a real photographic cutout of a model with flat white hand-drawn 2D illustration.
+        const generatedCampaigns: { objectId: string; objectLabel: string; view: GeneratedView }[] = [];
+
+        for (let pi = 0; pi < propsToGenerate.length; pi++) {
+          const prop = propsToGenerate[pi];
+
+          setApparelItems(prev => prev.map(i => i.id === item.id ? {
+            ...i,
+            campaignProgress: { current: pi, total: propsToGenerate.length }
+          } : i));
+
+          const parts: any[] = imageDataParts.map(img => ({
+            inlineData: { data: img.data, mimeType: img.mimeType }
+          }));
+
+          if (logoBase64) {
+            parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
+          }
+
+          const campaignPrompt = `You are a Mixed-Media Campaign Art Director creating a high-impact streetwear campaign for VPPA Fashions. Produce a single 1:1 square mixed-media campaign image combining a real photographic cutout of a model with flat white hand-drawn 2D illustration.
 
 CANVAS & COLOR SYSTEM:
 - 1:1 square format.
@@ -763,11 +772,11 @@ MODEL (REAL PHOTOGRAPHIC CUTOUT):
 - Pose is active, caught mid-action. The body position must make the physical interaction with the illustrated object feel natural and real.
 
 ILLUSTRATED OBJECT (HAND-DRAWN 2D):
-- Object: ${pickedObject}.
+- Object: ${prop.prompt}.
 - Drawn in pure white (#FFFFFF) only. Flat 2D illustration, brush-pen marker line quality, 3-5px line weight, slightly imperfect organic edges (hand-drawn feel, not vector-perfect). NO shading, NO gradients, flat white fill only.
 - SCALE: the object must be MASSIVE -- at least 40% of canvas height. Monumental oversized scale is encouraged.
 - DEPTH LAYERING is critical: parts of the object sit BEHIND the model, parts come IN FRONT of the model. The model's real hands or feet make contact at the intersection point so the scene reads as integrated, not collaged.
-- INTERACTION: ${pickedInteraction}. The relationship must be instantly readable in 2 seconds. Caught mid-action, alive.
+- INTERACTION: ${prop.interaction}. The relationship must be instantly readable in 2 seconds. Caught mid-action, alive.
 
 BRAND STAMP:
 - One small "VPPA" wordmark naturally embedded on the surface of the illustrated object -- as if printed, engraved, or stitched -- rendered in ${heroDark}. Subtle, not dominant.
@@ -794,39 +803,47 @@ STRICT TECH RULES:
 
 Reproduce the EXACT apparel from the provided reference images on the model. Output one image only.`;
 
-        parts.push({ text: campaignPrompt });
+          parts.push({ text: campaignPrompt });
 
-        try {
-          const response = await genAI.models.generateContent({
-            model: 'gemini-3.1-flash-image-preview',
-            contents: { parts },
-            config: {
-              imageConfig: { aspectRatio: "1:1", imageSize: "1K" }
+          try {
+            const response = await genAI.models.generateContent({
+              model: 'gemini-3.1-flash-image-preview',
+              contents: { parts },
+              config: {
+                imageConfig: { aspectRatio: "1:1", imageSize: "1K" }
+              }
+            });
+
+            let url = '';
+            let desc = '';
+            for (const p of response.candidates?.[0]?.content?.parts || []) {
+              if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
+              else if (p.text) desc = p.text;
             }
-          });
 
-          let url = '';
-          let desc = '';
-          for (const part of response.candidates?.[0]?.content?.parts || []) {
-            if (part.inlineData) url = `data:image/png;base64,${part.inlineData.data}`;
-            else if (part.text) desc = part.text;
+            if (url) {
+              generatedCampaigns.push({
+                objectId: prop.id,
+                objectLabel: prop.label,
+                view: { url, type: prop.label, description: desc || `VPPA x ${prop.label}` }
+              });
+              setApparelItems(prev => prev.map(i => i.id === item.id ? {
+                ...i,
+                campaignImages: [...generatedCampaigns]
+              } : i));
+            }
+
+            await sleep(1000);
+          } catch (err) {
+            console.error(`Campaign generation failed for ${prop.label}:`, err);
           }
-
-          if (url) {
-            setApparelItems(prev => prev.map(i => i.id === item.id ? {
-              ...i,
-              campaignImage: { url, type: 'Campaign', description: desc || 'VPPA brand campaign' },
-              campaignStatus: 'completed'
-            } : i));
-          } else {
-            setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, campaignStatus: 'error' } : i));
-          }
-
-          await sleep(1000);
-        } catch (err) {
-          console.error('Campaign generation failed:', err);
-          setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, campaignStatus: 'error' } : i));
         }
+
+        setApparelItems(prev => prev.map(i => i.id === item.id ? {
+          ...i,
+          campaignStatus: generatedCampaigns.length > 0 ? 'completed' : 'error',
+          campaignProgress: undefined
+        } : i));
       }
     } finally {
       setIsGeneratingCampaigns(false);
@@ -1244,141 +1261,188 @@ Reproduce the EXACT apparel from the provided reference images on the model. Out
                 </div>
                 <p className="text-sm text-gray-400">Mixed-media streetwear posters -- real model photography meets hand-drawn 2D illustration</p>
               </div>
-              <button
-                onClick={() => generateCampaigns()}
-                disabled={apparelItems.length === 0 || isGeneratingCampaigns || isGenerating}
-                className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-fuchsia-500 to-rose-500 hover:from-fuchsia-600 hover:to-rose-600 text-white shadow-md shadow-fuchsia-500/20"
-              >
-                {isGeneratingCampaigns ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Generate All Campaigns
-                  </>
-                )}
-              </button>
+              {(() => {
+                const totalSelected = apparelItems.reduce((sum, i) => sum + (i.selectedCampaignObjects?.length || 0), 0);
+                return (
+                  <button
+                    onClick={() => generateCampaigns()}
+                    disabled={totalSelected === 0 || isGeneratingCampaigns || isGenerating}
+                    className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-fuchsia-500 to-rose-500 hover:from-fuchsia-600 hover:to-rose-600 text-white shadow-md shadow-fuchsia-500/20"
+                  >
+                    {isGeneratingCampaigns ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Creating all...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        Generate All {totalSelected > 0 ? `(${totalSelected})` : ''}
+                      </>
+                    )}
+                  </button>
+                );
+              })()}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="space-y-6">
               {apparelItems.map((item) => {
                 const hero = item.heroColor || '#6366f1';
-                const heroDark = darkenHex(hero, 20);
+                const selectedProps = item.selectedCampaignObjects || [];
+                const hasSelection = selectedProps.length > 0;
+                const isItemGenerating = item.campaignStatus === 'generating';
+                const campaignImages = item.campaignImages || [];
                 return (
                   <div key={`campaign-${item.id}`} className="glass rounded-2xl overflow-hidden">
+                    {/* Header */}
                     <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
-                      <img src={item.images[0].preview} alt="ref" className="w-12 h-12 rounded-lg object-cover border border-gray-200" />
+                      <img src={item.images[0].preview} alt="ref" className="w-11 h-11 rounded-lg object-cover border border-gray-200" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-700 truncate">Campaign Poster</span>
+                          <span className="text-sm font-medium text-gray-700 truncate">Campaign Posters</span>
                           {item.uploadMode === 'printed' && (
                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 font-medium">Printed</span>
                           )}
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">{selectedProps.length} selected</span>
                         </div>
                         <p className="text-[10px] text-gray-400">{item.images.length} reference{item.images.length > 1 ? 's' : ''}</p>
                       </div>
-                      {item.campaignStatus === 'generating' && (
-                        <span className="text-[10px] text-fuchsia-500 flex items-center gap-1.5">
-                          <Loader2 className="w-3 h-3 animate-spin" /> Creating
-                        </span>
-                      )}
-                      {item.campaignStatus === 'completed' && (
-                        <span className="text-[10px] text-emerald-500 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> Ready
-                        </span>
-                      )}
-                      {item.campaignStatus === 'error' && (
-                        <span className="text-[10px] text-red-500 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" /> Failed
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="px-5 py-4 border-b border-gray-100 space-y-3">
-                      <div>
-                        <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-2 block">Hero Color</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={hero}
-                            onChange={(e) => updateCampaignField(item.id, 'heroColor', e.target.value)}
-                            className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer"
-                          />
-                          <div className="flex-1 flex items-center gap-2 px-2 py-2 rounded-lg bg-white border border-gray-200">
-                            <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: hero }} />
-                            <span className="text-[11px] font-mono text-gray-600 uppercase">{hero}</span>
-                          </div>
-                          <div className="flex flex-col gap-0.5">
-                            <div className="w-4 h-4 rounded-sm border border-gray-200" style={{ backgroundColor: hero }} title="Base" />
-                            <div className="w-4 h-4 rounded-sm border border-gray-200" style={{ backgroundColor: heroDark }} title="Blob (20% darker)" />
-                          </div>
-                        </div>
-                        <p className="text-[9px] text-gray-300 mt-1.5">Auto-detected from apparel</p>
-                      </div>
-                      <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-fuchsia-50/60 border border-fuchsia-100">
-                        <Sparkles className="w-3.5 h-3.5 text-fuchsia-500 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-medium text-fuchsia-700 uppercase tracking-wider">AI Picks the Prop</p>
-                          {item.campaignObject ? (
-                            <p className="text-[11px] text-gray-600 mt-0.5 leading-snug line-clamp-2">{item.campaignObject}</p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={hero}
+                          onChange={(e) => updateCampaignField(item.id, 'heroColor', e.target.value)}
+                          className="w-9 h-9 rounded-lg border border-gray-200 cursor-pointer"
+                          title="Hero color"
+                        />
+                        <button
+                          onClick={() => generateCampaigns(item.id)}
+                          disabled={!hasSelection || isItemGenerating || isGenerating || isGeneratingCampaigns}
+                          className="px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-fuchsia-500 to-rose-500 hover:from-fuchsia-600 hover:to-rose-600 text-white shadow-sm"
+                        >
+                          {isItemGenerating ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              {item.campaignProgress ? `${item.campaignProgress.current + 1}/${item.campaignProgress.total}` : 'Creating'}
+                            </>
                           ) : (
-                            <p className="text-[11px] text-gray-400 mt-0.5">Will be chosen automatically based on your apparel + model gender</p>
+                            <>
+                              <Sparkles className="w-3.5 h-3.5" />
+                              Generate {hasSelection ? `(${selectedProps.length})` : ''}
+                            </>
                           )}
-                        </div>
+                        </button>
                       </div>
                     </div>
 
-                    <div className="p-5">
-                      <div className="aspect-square rounded-xl overflow-hidden relative border border-gray-200 group" style={{ backgroundColor: item.campaignImage ? 'transparent' : hero + '20' }}>
-                        {item.campaignImage ? (
-                          <>
-                            <img src={item.campaignImage.url} alt="Campaign" className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-end justify-center p-4 gap-2">
-                              <button
-                                onClick={() => downloadImage(item.campaignImage!.url, `VPPA_Campaign_${item.id}.png`)}
-                                className="px-4 py-2 rounded-lg bg-white text-gray-800 text-xs font-semibold flex items-center gap-1.5 hover:bg-gray-50 shadow-sm"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                                Save
-                              </button>
-                              <button
-                                onClick={() => generateCampaigns(item.id)}
-                                disabled={isGeneratingCampaigns}
-                                className="px-4 py-2 rounded-lg bg-fuchsia-500 text-white text-xs font-semibold flex items-center gap-1.5 hover:bg-fuchsia-600 shadow-sm disabled:opacity-60"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                                Regenerate
-                              </button>
-                            </div>
-                          </>
-                        ) : item.campaignStatus === 'generating' ? (
-                          <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                            <Loader2 className="w-8 h-8 animate-spin text-fuchsia-500" />
-                            <p className="text-[10px] text-fuchsia-600 font-medium uppercase tracking-wider">Composing campaign...</p>
-                            <div className="w-24 h-0.5 rounded-full bg-fuchsia-100 overflow-hidden">
-                              <div className="h-full bg-fuchsia-400 rounded-full shimmer" style={{ width: '60%' }} />
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-6 text-center">
-                            <div className="w-12 h-12 rounded-xl bg-white/70 flex items-center justify-center shadow-sm">
-                              <Sparkles className="w-6 h-6" style={{ color: heroDark }} />
-                            </div>
-                            <p className="text-xs font-medium" style={{ color: heroDark }}>Ready to generate</p>
-                            <button
-                              onClick={() => generateCampaigns(item.id)}
-                              disabled={isGeneratingCampaigns || isGenerating}
-                              className="mt-1 px-4 py-2 rounded-lg bg-white/90 border border-gray-200 text-[11px] font-semibold text-gray-700 hover:bg-white flex items-center gap-1.5 disabled:opacity-40"
-                            >
-                              <Sparkles className="w-3 h-3" />
-                              Create Poster
-                            </button>
-                          </div>
-                        )}
+                    {/* Prop Selection */}
+                    <div className="px-5 py-4 border-b border-gray-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Select Props (multiple)</label>
+                        <div className="flex gap-2 text-[10px]">
+                          <button
+                            onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedCampaignObjects: CAMPAIGN_PROPS.map(p => p.id) } : i))}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            Select all
+                          </button>
+                          <span className="text-gray-200">·</span>
+                          <button
+                            onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedCampaignObjects: [] } : i))}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            Clear
+                          </button>
+                        </div>
                       </div>
+                      <div className="flex flex-wrap gap-2">
+                        {CAMPAIGN_PROPS.map(prop => {
+                          const isSelected = selectedProps.includes(prop.id);
+                          return (
+                            <button
+                              key={prop.id}
+                              onClick={() => toggleCampaignProp(item.id, prop.id)}
+                              disabled={isItemGenerating}
+                              className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 border disabled:opacity-50 ${
+                                isSelected
+                                  ? 'bg-fuchsia-500 text-white border-fuchsia-500 shadow-sm'
+                                  : 'bg-white text-gray-500 border-gray-200 hover:border-fuchsia-200 hover:text-gray-700'
+                              }`}
+                            >
+                              {prop.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Results */}
+                    <div className="p-5">
+                      {campaignImages.length === 0 && !isItemGenerating ? (
+                        <div className="py-10 flex flex-col items-center justify-center gap-2 text-center">
+                          <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center">
+                            <Sparkles className="w-5 h-5 text-gray-300" />
+                          </div>
+                          <p className="text-xs text-gray-400">Select one or more props, then hit Generate</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {(() => {
+                            const selectedPropDefs = CAMPAIGN_PROPS.filter(p => selectedProps.includes(p.id));
+                            const total = isItemGenerating && item.campaignProgress ? item.campaignProgress.total : selectedPropDefs.length;
+                            const currentIdx = item.campaignProgress?.current ?? -1;
+                            return selectedPropDefs.slice(0, Math.max(total, campaignImages.length)).map((prop, idx) => {
+                              const generated = campaignImages.find(c => c.objectId === prop.id);
+                              const isCurrent = isItemGenerating && idx === currentIdx;
+                              const isWaiting = isItemGenerating && idx > currentIdx && !generated;
+                              return (
+                                <div key={prop.id} className="group">
+                                  <div className={`aspect-square rounded-xl overflow-hidden relative border transition-all ${
+                                    generated ? 'border-gray-200 hover:border-gray-300' : 'border-gray-100 bg-gray-50/50'
+                                  } ${isCurrent ? 'ring-1 ring-fuchsia-300' : ''}`}>
+                                    {generated ? (
+                                      <>
+                                        <img src={generated.view.url} alt={prop.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
+                                          <button
+                                            onClick={() => downloadImage(generated.view.url, `VPPA_Campaign_${prop.id}_${item.id}.png`)}
+                                            className="w-full py-1.5 rounded-lg bg-white text-gray-700 text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 shadow-sm"
+                                          >
+                                            <Download className="w-3 h-3" />
+                                            Save
+                                          </button>
+                                        </div>
+                                      </>
+                                    ) : isCurrent ? (
+                                      <div className="w-full h-full flex flex-col items-center justify-center gap-1.5">
+                                        <Loader2 className="w-5 h-5 animate-spin text-fuchsia-500" />
+                                        <div className="w-8 h-0.5 rounded-full bg-fuchsia-100 overflow-hidden">
+                                          <div className="h-full bg-fuchsia-400 rounded-full shimmer" style={{ width: '60%' }} />
+                                        </div>
+                                      </div>
+                                    ) : isWaiting ? (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-gray-200 animate-pulse" />
+                                      </div>
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center">
+                                          <ImageIcon className="w-3 h-3 text-gray-300" />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p className={`text-[10px] mt-1.5 text-center font-medium truncate ${
+                                    generated ? 'text-gray-500' : isCurrent ? 'text-fuchsia-500' : 'text-gray-300'
+                                  }`}>
+                                    {prop.label}
+                                  </p>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
