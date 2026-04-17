@@ -34,7 +34,36 @@ interface ApparelItem {
   currentProcessingIndex?: number;
   generatedStyleId?: string;
   uploadMode: UploadMode;
+  heroColor?: string;
+  campaignObject?: string;
+  campaignImage?: GeneratedView;
+  campaignStatus?: 'idle' | 'generating' | 'completed' | 'error';
 }
+
+interface CampaignObject {
+  id: string;
+  label: string;
+  prompt: string;
+  emoji: string;
+}
+
+const CAMPAIGN_OBJECTS: CampaignObject[] = [
+  { id: 'shopping-bag', label: 'Luxury Shopping Bag', prompt: 'a massive oversized luxury paper shopping bag with rope handles, rectangular body, sharp folded edges', emoji: 'SB' },
+  { id: 'sneaker', label: 'Giant Sneaker', prompt: 'an enormous sneaker/trainer shown in full side profile, prominent laces, chunky sole, athletic silhouette', emoji: 'SN' },
+  { id: 'hanger', label: 'Oversized Hanger', prompt: 'a giant wooden clothes hanger with a curved metal hook at top, triangular wooden frame', emoji: 'HG' },
+  { id: 'sunglasses', label: 'Huge Sunglasses', prompt: 'massive oversized aviator or wayfarer sunglasses with two lenses and a bridge, thick frames', emoji: 'SG' },
+  { id: 'handbag', label: 'Giant Handbag', prompt: 'a monumentally oversized luxury handbag with a long shoulder chain strap, rectangular body, clasp detail', emoji: 'HB' },
+  { id: 'perfume', label: 'Perfume Bottle', prompt: 'a giant rectangular glass-style perfume bottle with a prominent cap, elegant proportions', emoji: 'PF' },
+  { id: 'coffee-cup', label: 'Takeaway Coffee Cup', prompt: 'an oversized takeaway coffee cup with a domed lid, corrugated cardboard sleeve, a straw or steam lines', emoji: 'CC' },
+  { id: 'boombox', label: 'Retro Boombox', prompt: 'a massive 80s style boombox with two large round speakers, cassette deck center, carrying handle on top, antenna', emoji: 'BX' },
+  { id: 'polaroid', label: 'Polaroid Camera', prompt: 'an oversized polaroid instant camera, boxy rectangular shape with round lens, flash, and a photo emerging from the slot', emoji: 'PL' },
+  { id: 'magazine', label: 'Fashion Magazine', prompt: 'a giant open fashion magazine held in mid-air, spread showing two pages, curved paper edges', emoji: 'MG' },
+  { id: 'cap', label: 'Oversized Cap', prompt: 'a huge baseball cap/snapback shown from the side, curved brim, panel structure, adjustable strap', emoji: 'CP' },
+  { id: 'umbrella', label: 'Giant Umbrella', prompt: 'a massive open umbrella from a side/three-quarter angle, canopy with visible panels, curved handle extending downward', emoji: 'UB' },
+  { id: 'cassette', label: 'Cassette Tape', prompt: 'a giant retro cassette tape, two circular reels visible through the plastic window, label area in center', emoji: 'CS' },
+  { id: 'vinyl', label: 'Vinyl Record', prompt: 'a giant vinyl record with its sleeve partially slid out, circular record with center label and radial grooves', emoji: 'VN' },
+  { id: 'skateboard', label: 'Skateboard', prompt: 'an oversized skateboard shown from the side/angle with visible wheels and deck, trucks exposed', emoji: 'SK' },
+];
 
 const MAX_PHOTOS_PER_ITEM = 5;
 
@@ -206,6 +235,7 @@ function StudioApp() {
   const [selectedStyle, setSelectedStyle] = useState(BACKGROUND_STYLES[0]);
   const [selectedGender, setSelectedGender] = useState<Gender>('women');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingCampaigns, setIsGeneratingCampaigns] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addPhotoInputRef = useRef<HTMLInputElement>(null);
@@ -245,6 +275,8 @@ function StudioApp() {
       images.push({ file, preview });
     }
 
+    const heroColor = images.length ? await extractDominantColor(images[0].preview) : '#6366f1';
+
     setApparelItems(prev => [
       ...prev,
       {
@@ -252,7 +284,10 @@ function StudioApp() {
         images,
         views: [],
         status: 'idle',
-        uploadMode: 'standard'
+        uploadMode: 'standard',
+        heroColor,
+        campaignObject: CAMPAIGN_OBJECTS[0].id,
+        campaignStatus: 'idle'
       }
     ]);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -297,6 +332,8 @@ function StudioApp() {
     const preview = await readFileAsPreview(file);
     const backImage: ReferenceImage = { file, preview, label: 'back' };
 
+    const heroColor = await extractDominantColor(pendingPrintedFront.preview);
+
     setApparelItems(prev => [
       ...prev,
       {
@@ -304,7 +341,10 @@ function StudioApp() {
         images: [pendingPrintedFront, backImage],
         views: [],
         status: 'idle',
-        uploadMode: 'printed'
+        uploadMode: 'printed',
+        heroColor,
+        campaignObject: CAMPAIGN_OBJECTS[0].id,
+        campaignStatus: 'idle'
       }
     ]);
     setPendingPrintedFront(null);
@@ -349,6 +389,76 @@ function StudioApp() {
       };
       reader.onerror = error => reject(error);
     });
+  };
+
+  const extractDominantColor = (imageUrl: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const size = 80;
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return resolve('#6366f1');
+          ctx.drawImage(img, 0, 0, size, size);
+          const data = ctx.getImageData(0, 0, size, size).data;
+          const buckets = new Map<string, { count: number; r: number; g: number; b: number }>();
+
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            const a = data[i + 3];
+            if (a < 128) continue;
+            const brightness = (r + g + b) / 3;
+            if (brightness > 235 || brightness < 25) continue;
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            if (max - min < 25) continue;
+            const qr = Math.round(r / 24) * 24;
+            const qg = Math.round(g / 24) * 24;
+            const qb = Math.round(b / 24) * 24;
+            const key = `${qr},${qg},${qb}`;
+            const existing = buckets.get(key);
+            if (existing) {
+              existing.count++;
+              existing.r += r;
+              existing.g += g;
+              existing.b += b;
+            } else {
+              buckets.set(key, { count: 1, r, g, b });
+            }
+          }
+
+          let best = { count: 0, r: 99, g: 102, b: 241 };
+          buckets.forEach((v) => { if (v.count > best.count) best = v; });
+          const r = Math.round(best.r / best.count);
+          const g = Math.round(best.g / best.count);
+          const b = Math.round(best.b / best.count);
+          const hex = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+          resolve(hex);
+        } catch {
+          resolve('#6366f1');
+        }
+      };
+      img.onerror = () => resolve('#6366f1');
+      img.src = imageUrl;
+    });
+  };
+
+  const darkenHex = (hex: string, percent: number): string => {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    const factor = 1 - percent / 100;
+    const nr = Math.max(0, Math.round(r * factor));
+    const ng = Math.max(0, Math.round(g * factor));
+    const nb = Math.max(0, Math.round(b * factor));
+    return '#' + [nr, ng, nb].map(v => v.toString(16).padStart(2, '0')).join('');
   };
 
   const downloadImage = (url: string, filename: string) => {
@@ -573,6 +683,132 @@ Also provide a one-sentence product description.`,
       console.error("Generation failed:", error);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const updateCampaignField = (itemId: string, field: 'heroColor' | 'campaignObject', value: string) => {
+    setApparelItems(prev => prev.map(i => i.id === itemId ? { ...i, [field]: value } : i));
+  };
+
+  const generateCampaigns = async (targetItemId?: string) => {
+    const targets = targetItemId
+      ? apparelItems.filter(i => i.id === targetItemId)
+      : apparelItems;
+    if (targets.length === 0) return;
+
+    setIsGeneratingCampaigns(true);
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+    try {
+      const logoBase64 = logo ? await fileToBase64(logo.file) : null;
+
+      for (const item of targets) {
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, campaignStatus: 'generating' } : i));
+
+        const hero = item.heroColor || '#6366f1';
+        const heroDark = darkenHex(hero, 20);
+        const objectDef = CAMPAIGN_OBJECTS.find(o => o.id === item.campaignObject) || CAMPAIGN_OBJECTS[0];
+
+        const imageDataParts: { data: string; mimeType: string }[] = [];
+        for (const img of item.images) {
+          const base64 = await fileToBase64(img.file);
+          imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
+        }
+
+        const parts: any[] = imageDataParts.map(img => ({
+          inlineData: { data: img.data, mimeType: img.mimeType }
+        }));
+
+        if (logoBase64) {
+          parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
+        }
+
+        const modelDescription = selectedGender === 'women'
+          ? "a single young Indian woman, age 20-26, elegant features, medium-brown skin, styled dark hair, confident expression"
+          : "a single young Indian man, age 20-26, sharp features, medium-brown skin, well-groomed hair, confident expression";
+
+        const campaignPrompt = `You are a Mixed-Media Campaign Art Director creating a high-impact streetwear campaign for VPPA Fashions. Produce a single 1:1 square mixed-media campaign image combining a real photographic cutout of a model with flat white hand-drawn 2D illustration.
+
+CANVAS & COLOR SYSTEM:
+- 1:1 square format.
+- Background: flat saturated ${hero} color field. Absolutely NO gradients, NO texture, NO photographic background.
+- Overlay: 3-4 organic amoeba-like blob shapes in ${heroDark} (20% darker than the base). Smooth irregular edges, scattered asymmetrically, some bleeding off-frame.
+- Feel is hand-painted but cleanly executed.
+
+MODEL (REAL PHOTOGRAPHIC CUTOUT):
+- ${modelDescription}.
+- The model is a clean photographic cutout -- zero fringing, sharp edges.
+- She/he is wearing the EXACT apparel shown in the reference images -- reproduce the garment faithfully in color, cut, prints, and details.
+- Pose is active, caught mid-action. The body position must make the physical interaction with the illustrated object feel natural and real.
+
+ILLUSTRATED OBJECT (HAND-DRAWN 2D):
+- Object: ${objectDef.prompt}.
+- Drawn in pure white (#FFFFFF) only. Flat 2D illustration, brush-pen marker line quality, 3-5px line weight, slightly imperfect organic edges (hand-drawn feel, not vector-perfect). NO shading, NO gradients, flat white fill only.
+- SCALE: the object must be MASSIVE -- at least 40% of canvas height. Monumental oversized scale is encouraged.
+- DEPTH LAYERING is critical: parts of the object sit BEHIND the model, parts come IN FRONT of the model. The model's real hands or feet make contact at the intersection point so the scene reads as integrated, not collaged.
+- INTERACTION: the model is actively holding, wearing, standing on, riding, leaning against, or emerging from the object. The relationship must be instantly readable in 2 seconds. Caught mid-action, alive.
+
+BRAND STAMP:
+- One small "VPPA" wordmark naturally embedded on the surface of the illustrated object -- as if printed, engraved, or stitched -- rendered in ${heroDark}. Subtle, not dominant.
+${logoBase64 ? '- Use the provided VPPA logo for the brand stamp and supporting marks, rendered in flat white line form.' : ''}
+
+SUPPORTING ILLUSTRATION SYSTEM (all white, flat, brush-pen line style, same visual language as the hero object):
+- A large VPPA logo mark in the upper-left corner, about 15% of canvas width.
+- A medium VPPA mark in the opposite corner, about 10% of canvas width.
+- 2-3 manga-style exclamation dash clusters near the point of contact between the model and the object.
+- 2-4 curved speed/motion lines tapered at the ends, radiating from the object or the model's most active body part; some should cross behind the model and some in front for depth.
+- Ground effect at the base of the scene: sparkle stars, short speed dashes, or object-specific effect (splash if cup, dust clouds if sneaker, wheel tracks if skateboard).
+- 1-2 loose organic white squiggles floating near the model's torso for visual rhythm.
+
+LIGHTING ON THE MODEL:
+- Studio strobe, high-key, even and clean, 5500K neutral. No dramatic shadows on the model. Soft contact shadow at the feet at about 15% opacity.
+- The photography should read as natural and real against the graphic illustrated environment.
+
+STRICT TECH RULES:
+- Exactly 3 colors in the composition: ${hero} light base, ${heroDark} darker blobs, and pure white illustration. The only additional colors permitted are the model's natural skin tones and the actual fabric colors of the garment.
+- Aesthetic references: Y2K comic energy, Japanese streetwear magazine, brush marker illustration.
+- Asymmetric, dynamic composition. The interaction point between the model and object is the visual center of gravity; everything else orbits around it.
+- NO text. NO wordmarks beyond the small embedded VPPA stamp and logo icons already described. NO watermarks.
+- Mood: the model is not posing WITH the object -- the model is IN THE MIDDLE of using it, caught mid-action.
+
+Reproduce the EXACT apparel from the provided reference images on the model. Output one image only.`;
+
+        parts.push({ text: campaignPrompt });
+
+        try {
+          const response = await genAI.models.generateContent({
+            model: 'gemini-3.1-flash-image-preview',
+            contents: { parts },
+            config: {
+              imageConfig: { aspectRatio: "1:1", imageSize: "1K" }
+            }
+          });
+
+          let url = '';
+          let desc = '';
+          for (const part of response.candidates?.[0]?.content?.parts || []) {
+            if (part.inlineData) url = `data:image/png;base64,${part.inlineData.data}`;
+            else if (part.text) desc = part.text;
+          }
+
+          if (url) {
+            setApparelItems(prev => prev.map(i => i.id === item.id ? {
+              ...i,
+              campaignImage: { url, type: 'Campaign', description: desc || 'VPPA brand campaign' },
+              campaignStatus: 'completed'
+            } : i));
+          } else {
+            setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, campaignStatus: 'error' } : i));
+          }
+
+          await sleep(1000);
+        } catch (err) {
+          console.error('Campaign generation failed:', err);
+          setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, campaignStatus: 'error' } : i));
+        }
+      }
+    } finally {
+      setIsGeneratingCampaigns(false);
     }
   };
 
@@ -969,6 +1205,171 @@ Also provide a one-sentence product description.`,
             </div>
           )}
         </AnimatePresence>
+
+        {/* Brand Campaigns Section */}
+        {apparelItems.length > 0 && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-16 pt-10 border-t border-gray-200"
+          >
+            <div className="flex items-end justify-between mb-6">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-gradient-to-r from-indigo-100 to-violet-100 text-indigo-700 font-semibold uppercase tracking-wider">New</span>
+                  <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
+                    Brand <span className="font-serif italic font-normal text-gray-500">Campaigns</span>
+                  </h2>
+                </div>
+                <p className="text-sm text-gray-400">Mixed-media streetwear posters -- real model photography meets hand-drawn 2D illustration</p>
+              </div>
+              <button
+                onClick={() => generateCampaigns()}
+                disabled={apparelItems.length === 0 || isGeneratingCampaigns || isGenerating}
+                className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-fuchsia-500 to-rose-500 hover:from-fuchsia-600 hover:to-rose-600 text-white shadow-md shadow-fuchsia-500/20"
+              >
+                {isGeneratingCampaigns ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Generate All Campaigns
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {apparelItems.map((item) => {
+                const hero = item.heroColor || '#6366f1';
+                const heroDark = darkenHex(hero, 20);
+                const objectDef = CAMPAIGN_OBJECTS.find(o => o.id === item.campaignObject) || CAMPAIGN_OBJECTS[0];
+                return (
+                  <div key={`campaign-${item.id}`} className="glass rounded-2xl overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+                      <img src={item.images[0].preview} alt="ref" className="w-12 h-12 rounded-lg object-cover border border-gray-200" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-700 truncate">Campaign Poster</span>
+                          {item.uploadMode === 'printed' && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 font-medium">Printed</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-gray-400">{item.images.length} reference{item.images.length > 1 ? 's' : ''}</p>
+                      </div>
+                      {item.campaignStatus === 'generating' && (
+                        <span className="text-[10px] text-fuchsia-500 flex items-center gap-1.5">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Creating
+                        </span>
+                      )}
+                      {item.campaignStatus === 'completed' && (
+                        <span className="text-[10px] text-emerald-500 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Ready
+                        </span>
+                      )}
+                      {item.campaignStatus === 'error' && (
+                        <span className="text-[10px] text-red-500 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> Failed
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-gray-100">
+                      <div>
+                        <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-2 block">Hero Color</label>
+                        <div className="flex items-center gap-2">
+                          <div className="relative">
+                            <input
+                              type="color"
+                              value={hero}
+                              onChange={(e) => updateCampaignField(item.id, 'heroColor', e.target.value)}
+                              className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer"
+                            />
+                          </div>
+                          <div className="flex-1 flex items-center gap-2 px-2 py-2 rounded-lg bg-white border border-gray-200">
+                            <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: hero }} />
+                            <span className="text-[11px] font-mono text-gray-600 uppercase">{hero}</span>
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <div className="w-4 h-4 rounded-sm border border-gray-200" style={{ backgroundColor: hero }} title="Base" />
+                            <div className="w-4 h-4 rounded-sm border border-gray-200" style={{ backgroundColor: heroDark }} title="Blob (20% darker)" />
+                          </div>
+                        </div>
+                        <p className="text-[9px] text-gray-300 mt-1.5">Auto-detected from apparel</p>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-2 block">Illustrated Object</label>
+                        <select
+                          value={item.campaignObject || CAMPAIGN_OBJECTS[0].id}
+                          onChange={(e) => updateCampaignField(item.id, 'campaignObject', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-xs text-gray-700 focus:outline-none focus:border-fuchsia-300 focus:ring-2 focus:ring-fuchsia-100 transition-all"
+                        >
+                          {CAMPAIGN_OBJECTS.map(obj => (
+                            <option key={obj.id} value={obj.id}>{obj.label}</option>
+                          ))}
+                        </select>
+                        <p className="text-[9px] text-gray-300 mt-1.5">{objectDef.label}</p>
+                      </div>
+                    </div>
+
+                    <div className="p-5">
+                      <div className="aspect-square rounded-xl overflow-hidden relative border border-gray-200 group" style={{ backgroundColor: item.campaignImage ? 'transparent' : hero + '20' }}>
+                        {item.campaignImage ? (
+                          <>
+                            <img src={item.campaignImage.url} alt="Campaign" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-end justify-center p-4 gap-2">
+                              <button
+                                onClick={() => downloadImage(item.campaignImage!.url, `VPPA_Campaign_${item.id}.png`)}
+                                className="px-4 py-2 rounded-lg bg-white text-gray-800 text-xs font-semibold flex items-center gap-1.5 hover:bg-gray-50 shadow-sm"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                Save
+                              </button>
+                              <button
+                                onClick={() => generateCampaigns(item.id)}
+                                disabled={isGeneratingCampaigns}
+                                className="px-4 py-2 rounded-lg bg-fuchsia-500 text-white text-xs font-semibold flex items-center gap-1.5 hover:bg-fuchsia-600 shadow-sm disabled:opacity-60"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                Regenerate
+                              </button>
+                            </div>
+                          </>
+                        ) : item.campaignStatus === 'generating' ? (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                            <Loader2 className="w-8 h-8 animate-spin text-fuchsia-500" />
+                            <p className="text-[10px] text-fuchsia-600 font-medium uppercase tracking-wider">Composing campaign...</p>
+                            <div className="w-24 h-0.5 rounded-full bg-fuchsia-100 overflow-hidden">
+                              <div className="h-full bg-fuchsia-400 rounded-full shimmer" style={{ width: '60%' }} />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-6 text-center">
+                            <div className="w-12 h-12 rounded-xl bg-white/70 flex items-center justify-center shadow-sm">
+                              <Sparkles className="w-6 h-6" style={{ color: heroDark }} />
+                            </div>
+                            <p className="text-xs font-medium" style={{ color: heroDark }}>Ready to generate</p>
+                            <button
+                              onClick={() => generateCampaigns(item.id)}
+                              disabled={isGeneratingCampaigns || isGenerating}
+                              className="mt-1 px-4 py-2 rounded-lg bg-white/90 border border-gray-200 text-[11px] font-semibold text-gray-700 hover:bg-white flex items-center gap-1.5 disabled:opacity-40"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              Create Poster
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.section>
+        )}
       </main>
     </div>
   );
