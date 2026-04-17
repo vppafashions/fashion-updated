@@ -122,6 +122,26 @@ interface ApparelItem {
   saintLaurentImages?: { themeId: string; themeLabel: string; view: GeneratedView }[];
   saintLaurentStatus?: 'idle' | 'generating' | 'completed' | 'error';
   saintLaurentProgress?: { current: number; total: number };
+  selectedPradaThemes?: string[];
+  pradaImages?: { themeId: string; themeLabel: string; view: GeneratedView }[];
+  pradaStatus?: 'idle' | 'generating' | 'completed' | 'error';
+  pradaProgress?: { current: number; total: number };
+  selectedDiorThemes?: string[];
+  diorImages?: { themeId: string; themeLabel: string; view: GeneratedView }[];
+  diorStatus?: 'idle' | 'generating' | 'completed' | 'error';
+  diorProgress?: { current: number; total: number };
+  selectedJacquemusThemes?: string[];
+  jacquemusImages?: { themeId: string; themeLabel: string; view: GeneratedView }[];
+  jacquemusStatus?: 'idle' | 'generating' | 'completed' | 'error';
+  jacquemusProgress?: { current: number; total: number };
+  selectedBurberryThemes?: string[];
+  burberryImages?: { themeId: string; themeLabel: string; view: GeneratedView }[];
+  burberryStatus?: 'idle' | 'generating' | 'completed' | 'error';
+  burberryProgress?: { current: number; total: number };
+  selectedBalenciagaThemes?: string[];
+  balenciagaImages?: { themeId: string; themeLabel: string; view: GeneratedView }[];
+  balenciagaStatus?: 'idle' | 'generating' | 'completed' | 'error';
+  balenciagaProgress?: { current: number; total: number };
 }
 
 interface EditorialSetting {
@@ -221,6 +241,106 @@ const SAINTLAURENT_THEMES: SaintLaurentTheme[] = [
   { id: 'high-flash', label: 'High Flash', mood: 'Paparazzi, raw, fashion-week', backgroundDescription: 'pure dense black background with the slightest motion-blur halo around the subject from camera flash, no walls', backgroundHex: '#050505', lightingDescription: 'direct on-axis camera flash creating a sharp hard-edged shadow halo just outside the silhouette, harsh, slightly overexposed on highlights, 5500K cold flash quality', poseDirection: 'model walks straight at the camera mid-stride, looking down past the lens, attitude-driven, model-off-duty energy' },
   { id: 'silver-rain', label: 'Silver Rain', mood: 'Wet, glam-rock, glitter', backgroundDescription: 'deep gunmetal grey background with subtle water-droplet sheen specks suggesting rain, almost black, soft vignette', backgroundHex: '#1A1A1D', lightingDescription: 'two hard rim lights from upper-left and upper-right casting twin highlights along the body and water specs, deep central shadow, 4800K cool, very contrast-heavy', poseDirection: 'model stands head-on, arms slightly out, hair slick back as if wet, gaze sharp and direct, slight forward lean' },
   { id: 'velvet-couture', label: 'Velvet Couture', mood: 'Couture, salon, opera', backgroundDescription: 'deep oxblood velvet drape backdrop, rich deep wine red with subtle pile texture, soft vignette to dark', backgroundHex: '#3A1620', lightingDescription: 'single warm soft key from upper-left with strong falloff to deep shadow, subtle hair light from behind. 3800K very warm tungsten, 6:1 contrast, opera-house mood', poseDirection: 'model seated on a velvet stool in three-quarter view, one arm draped over the seat back, head tilted slightly, sultry editorial gaze' },
+];
+
+interface PradaTheme {
+  id: string;
+  label: string;
+  mood: string;
+  backgroundDescription: string;
+  backgroundHex: string;
+  setSetting: string;
+  poseDirection: string;
+}
+
+const PRADA_THEMES: PradaTheme[] = [
+  { id: 'acid-yellow', label: 'Acid Yellow', mood: 'Bold, conceptual, uniform', backgroundDescription: 'a completely flat acid-chartreuse yellow wall filling the frame, laboratory-bright, no gradient, no texture', backgroundHex: '#D8E041', setSetting: 'a minimal geometric gallery set, one large matte-black monolith cube or a slim stainless steel rod protruding from the floor as a conceptual prop', poseDirection: 'model stands rigid and centered, arms held close to the sides, gaze deadpan into the camera, slight institutional detachment' },
+  { id: 'cobalt-blocked', label: 'Cobalt Blocked', mood: 'Architectural, graphic, crisp', backgroundDescription: 'a sharp color-blocked backdrop split diagonally between a deep cobalt blue upper half and a flat vermilion lower half, laser-crisp edge', backgroundHex: '#1A3EB8', setSetting: 'a single polished aluminium bench or a geometric plinth, nothing else in frame', poseDirection: 'model sits on the bench in three-quarter view, knees together, one hand on thigh, eyes looking slightly off-frame with intellectual stillness' },
+  { id: 'flesh-pink', label: 'Flesh Pink', mood: 'Provocative, softly weird', backgroundDescription: 'a flat pale-flesh pink backdrop with a subtle matte texture, slightly cold pink, nothing else', backgroundHex: '#E8C7BE', setSetting: 'a thin transparent acrylic dividing panel bisecting the frame, catching a subtle refraction, otherwise empty', poseDirection: 'model stands behind the acrylic panel, pressing one palm lightly against it, head tilted, subtly off-kilter gaze' },
+  { id: 'industrial-slate', label: 'Industrial Slate', mood: 'Brutalist, minimal, cold', backgroundDescription: 'a raw polished concrete wall in cool slate grey with faint formwork seams, otherwise flat and uniform', backgroundHex: '#6B6E72', setSetting: 'a slim fluorescent strip light mounted horizontally mid-wall, otherwise empty floor', poseDirection: 'model stands statuesque in profile against the wall, head turned to camera, sculptural stillness' },
+  { id: 'olive-military', label: 'Olive Military', mood: 'Functional, utilitarian, sharp', backgroundDescription: 'a matte deep olive military-green wall, flat and uniform, like a factory-painted surface', backgroundHex: '#4F5A3A', setSetting: 'a single galvanised steel folding chair centered in frame, nothing else', poseDirection: 'model sits on the folding chair with knees apart, forearms resting on thighs, jaw squared, direct unflinching gaze' },
+  { id: 'millennial-rose', label: 'Millennial Rose', mood: 'Pop, ironic, glossy', backgroundDescription: 'a uniform glossy millennial-pink backdrop with a very subtle specular sheen, no gradient', backgroundHex: '#F2B9BD', setSetting: 'a reflective chrome stool or a mirrored disc on the floor reflecting the model lightly', poseDirection: 'model stands with one hand on hip, chin lifted, pop-deadpan gaze, slight runway commitment' },
+];
+
+interface DiorTheme {
+  id: string;
+  label: string;
+  mood: string;
+  locationDescription: string;
+  paletteDescription: string;
+  paletteHex: string;
+  poseDirection: string;
+  lightingDescription: string;
+}
+
+const DIOR_THEMES: DiorTheme[] = [
+  { id: 'baroque-salon', label: 'Baroque Salon', mood: 'Couture, romantic, Versailles', locationDescription: 'a gilded Versailles-style salon with cream panelled walls, ornate gold moulding, parquet floor, a marble bust in a shallow alcove', paletteDescription: 'cream ivory walls with warm gold accents and soft butter-cream highlights', paletteHex: '#F2E4C7', poseDirection: 'model leans one shoulder against a panelled wall, head tilted gracefully, free hand loosely holding a long silk ribbon', lightingDescription: 'soft north-facing window light pooling from camera-left, 5200K warm, creamy 2:1 ratio, painterly falloff into the corners' },
+  { id: 'garden-bloom', label: 'Garden Bloom', mood: 'Pastoral, romantic, floral', locationDescription: 'a spring garden alcove with climbing pale pink roses and hydrangeas on a weathered stone wall, soft grass underfoot', paletteDescription: 'pale pinks, sage greens, soft ivory blooms, misted morning light', paletteHex: '#E6CFD2', poseDirection: 'model stands among the blooms holding a single long-stem rose, half-turn to camera, eyes closed in quiet reverie', lightingDescription: 'very soft overcast morning diffusion, 5800K, shadowless, slight atmospheric haze in the distance' },
+  { id: 'renaissance-atelier', label: 'Renaissance Atelier', mood: 'Painterly, classical, couture', locationDescription: 'a painterly artist atelier with warm plaster walls, a partially draped easel in the corner, scattered antique sketchbooks, a heavy velvet curtain drawn open to one side', paletteDescription: 'umber warm earth tones, plum curtain, deep burnt sienna accents', paletteHex: '#A88A6D', poseDirection: 'model stands against the curtain in a three-quarter classical contrapposto pose, one hand resting lightly on a balustrade', lightingDescription: 'warm single-window chiaroscuro from upper-left, 4500K, 3:1 ratio, reminiscent of Vermeer or Caravaggio' },
+  { id: 'silk-drapery', label: 'Silk Drapery', mood: 'Haute couture, studio, poetic', locationDescription: 'a studio with cascading layers of silk drapery in soft champagne and powder rose falling from the ceiling to the polished oak floor', paletteDescription: 'champagne gold silk and soft powder rose, pearlescent sheen', paletteHex: '#EAD7C1', poseDirection: 'model stands among the drapes, one hand gently parting the silk, body in three-quarter view, dreamy distant gaze', lightingDescription: 'diffused overhead key with strong bounce fill making the silk glow, 5500K, 1.8:1 low contrast ethereal' },
+  { id: 'marble-statuary', label: 'Marble Statuary', mood: 'Classical, sculptural, couture', locationDescription: 'a museum statuary hall with polished white Carrara marble floor, classical plaster nudes and Greek busts on plinths in the background, tall arched windows', paletteDescription: 'bright cool whites, pale stone greys, faint green marble veining', paletteHex: '#E5E2D8', poseDirection: 'model stands between two statuary plinths in a classical pose, body slightly turned, head lifted, echoing the statues', lightingDescription: 'cool museum daylight through tall windows, 6000K, very diffused and shadowless, almost flat' },
+  { id: 'candlelit-boudoir', label: 'Candlelit Boudoir', mood: 'Intimate, twilight, couture', locationDescription: 'a candlelit Parisian boudoir with silk wallpaper, a velvet chaise longue, antique mirrors, brass candelabras glowing softly', paletteDescription: 'deep blush silk wallpaper, dark mahogany, warm candle-amber', paletteHex: '#5E2A3A', poseDirection: 'model reclines on the chaise in three-quarter view, one arm draped over the back, head turned toward camera, soft contemplative gaze', lightingDescription: 'warm candle flame key from camera-right supplemented by subtle ambient fill, 3000K, strong warm tungsten, 4:1 gentle chiaroscuro' },
+];
+
+interface JacquemusTheme {
+  id: string;
+  label: string;
+  mood: string;
+  locationDescription: string;
+  palette: string;
+  paletteHex: string;
+  surrealProp: string;
+  poseDirection: string;
+}
+
+const JACQUEMUS_THEMES: JacquemusTheme[] = [
+  { id: 'lavender-field', label: 'Lavender Field', mood: 'Provence, sun-kissed, dreamy', locationDescription: 'endless rows of lavender stretching to the horizon under a clear pale-blue Provencal sky', palette: 'lavender violet-purple, warm golden sun-bleached hues, chalky sky blue', paletteHex: '#B8A0D8', surrealProp: 'an oversized straw sun hat (2x normal size) that the model holds at arm\'s length', poseDirection: 'model walks along a dirt path between the lavender rows, mid-stride, holding the giant hat loosely, golden hour glow' },
+  { id: 'olive-grove', label: 'Olive Grove', mood: 'Mediterranean, warm, earthy', locationDescription: 'an ancient olive grove with gnarled silver-green trees, dry amber grass, terracotta dry stone wall in distance', palette: 'silver-sage olive green, warm terracotta, sun-bleached amber', paletteHex: '#BFC19B', surrealProp: 'an oversized single ripe olive branch with leaves (3x normal size) held in the model\'s arms', poseDirection: 'model stands under an olive tree cradling the giant branch, leaning shoulder against the trunk, serene sunlit gaze' },
+  { id: 'beach-cove', label: 'Beach Cove', mood: 'Riviera, turquoise, oversize', locationDescription: 'a small Mediterranean cove with turquoise water, white pebble beach, a single painted wooden rowboat in shallows', palette: 'turquoise sea, bone-white pebbles, sun-washed cream', paletteHex: '#88C8D4', surrealProp: 'a giant oversized lemon (5x normal size) or a massive white conch seashell held in hand', poseDirection: 'model stands in ankle-deep water holding the giant prop, white sun-bleached linen mood, golden warm skin' },
+  { id: 'stucco-wall', label: 'Stucco Wall', mood: 'Graphic, minimal, cote', locationDescription: 'a flat whitewashed Mediterranean stucco wall with a thin shadow line, a single terracotta pot with a sculpted olive tree', palette: 'cream white stucco, warm terracotta accents, bright cote blue door in the distance', paletteHex: '#F2EADC', surrealProp: 'an oversized single croissant (3x normal size) or a giant lemon wedge held at the chest', poseDirection: 'model stands against the stucco wall in profile silhouette, holding the giant prop, sun-bleached noon light' },
+  { id: 'yacht-deck', label: 'Yacht Deck', mood: 'Riviera jet-set, breezy', locationDescription: 'the bleached teak deck of a sleek yacht at sea, polished brass fittings, white linen sun-cushions, endless cobalt ocean on the horizon', palette: 'bleached teak, polished brass, cobalt sea, white linen', paletteHex: '#E5D4A1', surrealProp: 'a giant oversized tennis ball (4x normal size) or a massive single pearl held at the hip', poseDirection: 'model leans one hand on the teak rail, wind in hair, gaze off toward the horizon, oversize prop visible at their side' },
+  { id: 'cobblestone-alley', label: 'Cobblestone Alley', mood: 'Old-town, pastel, sun-dappled', locationDescription: 'a sun-dappled old-town cobblestone alley with pastel-painted shutters, terracotta tile roof visible above, a lone bougainvillea branch', palette: 'soft lemon yellow, powder blue, terracotta roof, muted rose shutters', paletteHex: '#F2D88A', surrealProp: 'an oversized straw market basket (3x normal size) overflowing with oversize peaches', poseDirection: 'model walks toward camera down the alley carrying the giant basket on one arm, warm late-afternoon sun raking across' },
+];
+
+interface BurberryTheme {
+  id: string;
+  label: string;
+  mood: string;
+  locationDescription: string;
+  paletteDescription: string;
+  paletteHex: string;
+  weatherAtmosphere: string;
+  poseDirection: string;
+}
+
+const BURBERRY_THEMES: BurberryTheme[] = [
+  { id: 'foggy-moors', label: 'Foggy Moors', mood: 'British, atmospheric, stoic', locationDescription: 'a wide Yorkshire-style moorland stretching to an invisible horizon, heather and dry grass, a lone gnarled tree in the middle distance', paletteDescription: 'muted sage green, dusty mauve heather, warm oatmeal, cold grey-blue sky', paletteHex: '#8C9287', weatherAtmosphere: 'thick rolling fog wrapping the landscape, subdued cool diffusion, faint drizzle, moisture on the grass', poseDirection: 'model stands alone on the moor with hands in coat pockets, wind tousling hair slightly, gaze into the fog, stoic quiet' },
+  { id: 'rainy-cobblestones', label: 'Rainy Cobblestones', mood: 'London, cinematic, noir', locationDescription: 'a narrow London cobblestone alley glistening with rain, a single antique iron lamppost glowing faintly, wet brick walls', paletteDescription: 'wet slate cobble, warm amber lamppost glow, deep charcoal, ochre brick', paletteHex: '#4D4A45', weatherAtmosphere: 'steady drizzle, cold damp air, subtle mist curling around the lamppost glow, reflections in the puddles', poseDirection: 'model walks toward camera mid-stride under the lamppost, collar turned up, hands in pockets, cinematic gaze slightly past the lens' },
+  { id: 'cliffside-wind', label: 'Cliffside Wind', mood: 'Coastal, windswept, heroic', locationDescription: 'a sheer British coastal cliff edge with wild sea-grass, chalky white cliffs falling into a grey sea below, distant seabirds', paletteDescription: 'chalky cliff white, muted sea green, overcast ashen sky, pale grass', paletteHex: '#CDCFC5', weatherAtmosphere: 'strong sea wind visibly tugging coat and hair, cold salt spray in the air, cool cloudy diffused light', poseDirection: 'model stands at the cliff edge in three-quarter view looking out to sea, coat and hair blowing dramatically, one hand steadying collar' },
+  { id: 'misty-lake', label: 'Misty Lake', mood: 'Lake-district, contemplative', locationDescription: 'the still edge of an English lake at dawn, wooden rowboat moored in reeds, forested far shore disappearing into mist', paletteDescription: 'silver-grey water, forest green, warm ochre reed, pale champagne mist', paletteHex: '#A4A59A', weatherAtmosphere: 'low dawn mist hovering above water surface, still air, ethereal cool light with pale warm sun struggling through', poseDirection: 'model stands at the reedy shore beside the moored boat, half-turned to camera, quiet meditative gaze toward the mist' },
+  { id: 'autumn-forest', label: 'Autumn Forest', mood: 'Earthy, heritage, warm', locationDescription: 'a British autumn beech forest with a carpet of fallen leaves, thin shafts of golden sunlight piercing through amber canopy', paletteDescription: 'rich copper-brown, burnt ochre, mossy green, warm gold leaf-light', paletteHex: '#9E6935', weatherAtmosphere: 'crisp cool air, faint leaf drift, shafts of warm sun creating atmospheric beams of amber light through haze', poseDirection: 'model walks through ankle-deep leaves between tree trunks, mid-stride in three-quarter view, warm glow on cheek' },
+  { id: 'country-house', label: 'Country House', mood: 'Heritage, stately, refined', locationDescription: 'the gravel drive of a grand English country manor with limestone facade, ivy climbing, clipped topiary hedges, a single vintage roadster parked in the background', paletteDescription: 'warm limestone cream, dark ivy green, slate grey roof, polished chestnut car', paletteHex: '#D6C9A0', weatherAtmosphere: 'overcast cool British afternoon, soft diffused cool light, slight haze over the manor, no harsh shadows', poseDirection: 'model stands on the gravel drive facing slightly away from the manor, half-turn to camera, one hand adjusting the collar, aristocratic stillness' },
+];
+
+interface BalenciagaTheme {
+  id: string;
+  label: string;
+  mood: string;
+  environmentDescription: string;
+  paletteDescription: string;
+  paletteHex: string;
+  weatherAtmosphere: string;
+  poseDirection: string;
+  lightingDescription: string;
+}
+
+const BALENCIAGA_THEMES: BalenciagaTheme[] = [
+  { id: 'snow-apocalypse', label: 'Snow Apocalypse', mood: 'Dystopian, blizzard, defiant', environmentDescription: 'a desolate white-out snowy plain with horizontal snow drifts and no visible horizon, a single leaning steel pole in distance', paletteDescription: 'near-white blizzard, icy cold blue-grey, black silhouettes', paletteHex: '#E5E8EB', weatherAtmosphere: 'heavy horizontal snowfall streaking across the frame, cold wind visibly pushing snow, desaturated freezing atmosphere', poseDirection: 'model stands facing the blizzard head-on, coat whipping in the wind, hood pulled up, defiant forward lean, unreadable expression', lightingDescription: 'harsh flat blizzard-diffused daylight, 7000K very cold, no shadows, overexposed highlights on skin, crushed black garments' },
+  { id: 'brutalist-bunker', label: 'Brutalist Bunker', mood: 'Cold-war, brutalist, sculptural', environmentDescription: 'the interior of a raw concrete brutalist bunker with formwork seams, one overhead fluorescent strip, a rusted heavy steel door partially open', paletteDescription: 'monolithic concrete grey, cold steel, flat fluorescent white, deep shadow', paletteHex: '#575756', weatherAtmosphere: 'cold damp air, faint industrial haze, fluorescent hum mood, echo-emptiness', poseDirection: 'model stands rigidly centered in the bunker facing camera, arms at sides, oversize silhouette, industrial stillness', lightingDescription: 'single overhead fluorescent casting hard downward shadow on cheeks and under coat, 6500K cold flat, 5:1 ratio, institutional' },
+  { id: 'rainswept-street', label: 'Rainswept Street', mood: 'Urban dystopia, neon wet noir', environmentDescription: 'a deserted nighttime city street drowning in rain, distant red/blue neon signage reflected in puddles, a toppled bollard', paletteDescription: 'wet asphalt black, neon magenta and electric cyan reflections, deep charcoal', paletteHex: '#2A1F2E', weatherAtmosphere: 'heavy vertical rain, steam rising from manhole grates, neon-lit raindrops catching the light like sparks', poseDirection: 'model walks into camera through the downpour, oversized coat soaking wet, head slightly down, gaze burning up toward lens', lightingDescription: 'mix of cold neon magenta + cyan from above with occasional harsh streetlight rim, 4000K variegated, 7:1 strong contrast, cinematic' },
+  { id: 'abandoned-mall', label: 'Abandoned Mall', mood: 'Post-consumer, surreal, stark', environmentDescription: 'an abandoned 90s shopping mall with flickering fluorescents, cracked marble floor, empty store vitrines covered with plastic sheeting', paletteDescription: 'sickly green fluorescent cast, beige marble, dusty plastic translucence', paletteHex: '#B8C1A8', weatherAtmosphere: 'still stale air with floating dust motes, eerie quiet, faint buzz', poseDirection: 'model stands alone in the empty concourse facing camera from a distance, oversized silhouette, head slightly tilted, stillness', lightingDescription: 'overhead flickering fluorescents casting green-tinted institutional light, 5000K with green cast, flat 2:1, CCTV-quality mood' },
+  { id: 'industrial-warehouse', label: 'Industrial Warehouse', mood: 'Factory, massive scale, raw', environmentDescription: 'the vast interior of an empty industrial warehouse with exposed steel trusses, polished concrete floor, rolling steel shutter half-open letting a single blinding shaft in', paletteDescription: 'industrial grey, rust orange accents, warm blinding daylight shaft', paletteHex: '#786A5E', weatherAtmosphere: 'dusty atmospheric haze catching the daylight shaft, absolute silence mood', poseDirection: 'model stands dwarfed by the massive warehouse scale, silhouetted in the daylight shaft, arms at sides, oversized coat', lightingDescription: 'single hard raking shaft of daylight from the half-open shutter across the floor, 5500K neutral, near-silhouette contrast 10:1, cinematic' },
+  { id: 'red-siren', label: 'Red Siren', mood: 'Alarm, dystopian, emergency', environmentDescription: 'a sealed industrial corridor awash in rotating red emergency lights, wet painted concrete walls, steel grated floor', paletteDescription: 'saturated alarm red wash over everything, deep black shadows, oily wet sheen', paletteHex: '#8E1C1C', weatherAtmosphere: 'heavy red-lit atmosphere with visible smoke swirling, oppressive close quarters', poseDirection: 'model stands in the corridor head-on, oversize outerwear, one hand slightly lifted toward camera, intense dead-calm gaze through the red haze', lightingDescription: 'rotating red emergency light as key creating strong colored wash and deep shadow falloff, 2200K extreme warm red, 6:1 contrast, dystopian' },
 ];
 
 interface PressPalette {
@@ -570,7 +690,12 @@ function StudioApp() {
   const [isGeneratingHermes, setIsGeneratingHermes] = useState(false);
   const [isGeneratingBottega, setIsGeneratingBottega] = useState(false);
   const [isGeneratingSaintLaurent, setIsGeneratingSaintLaurent] = useState(false);
-  const [campaignTab, setCampaignTab] = useState<'scenes' | 'press' | 'editorial' | 'heritage' | 'hermes' | 'bottega' | 'saintlaurent'>('scenes');
+  const [isGeneratingPrada, setIsGeneratingPrada] = useState(false);
+  const [isGeneratingDior, setIsGeneratingDior] = useState(false);
+  const [isGeneratingJacquemus, setIsGeneratingJacquemus] = useState(false);
+  const [isGeneratingBurberry, setIsGeneratingBurberry] = useState(false);
+  const [isGeneratingBalenciaga, setIsGeneratingBalenciaga] = useState(false);
+  const [campaignTab, setCampaignTab] = useState<'scenes' | 'press' | 'editorial' | 'heritage' | 'hermes' | 'bottega' | 'saintlaurent' | 'prada' | 'dior' | 'jacquemus' | 'burberry' | 'balenciaga'>('scenes');
   const [toast, setToast] = useState<{ kind: 'error' | 'info'; message: string } | null>(null);
 
   const showToast = (kind: 'error' | 'info', message: string) => {
@@ -1114,6 +1239,51 @@ Also provide a one-sentence product description.`,
       const current = i.selectedSaintLaurentThemes || [];
       const next = current.includes(themeId) ? current.filter(p => p !== themeId) : [...current, themeId];
       return { ...i, selectedSaintLaurentThemes: next };
+    }));
+  };
+
+  const togglePradaTheme = (itemId: string, themeId: string) => {
+    setApparelItems(prev => prev.map(i => {
+      if (i.id !== itemId) return i;
+      const current = i.selectedPradaThemes || [];
+      const next = current.includes(themeId) ? current.filter(p => p !== themeId) : [...current, themeId];
+      return { ...i, selectedPradaThemes: next };
+    }));
+  };
+
+  const toggleDiorTheme = (itemId: string, themeId: string) => {
+    setApparelItems(prev => prev.map(i => {
+      if (i.id !== itemId) return i;
+      const current = i.selectedDiorThemes || [];
+      const next = current.includes(themeId) ? current.filter(p => p !== themeId) : [...current, themeId];
+      return { ...i, selectedDiorThemes: next };
+    }));
+  };
+
+  const toggleJacquemusTheme = (itemId: string, themeId: string) => {
+    setApparelItems(prev => prev.map(i => {
+      if (i.id !== itemId) return i;
+      const current = i.selectedJacquemusThemes || [];
+      const next = current.includes(themeId) ? current.filter(p => p !== themeId) : [...current, themeId];
+      return { ...i, selectedJacquemusThemes: next };
+    }));
+  };
+
+  const toggleBurberryTheme = (itemId: string, themeId: string) => {
+    setApparelItems(prev => prev.map(i => {
+      if (i.id !== itemId) return i;
+      const current = i.selectedBurberryThemes || [];
+      const next = current.includes(themeId) ? current.filter(p => p !== themeId) : [...current, themeId];
+      return { ...i, selectedBurberryThemes: next };
+    }));
+  };
+
+  const toggleBalenciagaTheme = (itemId: string, themeId: string) => {
+    setApparelItems(prev => prev.map(i => {
+      if (i.id !== itemId) return i;
+      const current = i.selectedBalenciagaThemes || [];
+      const next = current.includes(themeId) ? current.filter(p => p !== themeId) : [...current, themeId];
+      return { ...i, selectedBalenciagaThemes: next };
     }));
   };
 
@@ -2079,6 +2249,395 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
     }
   };
 
+  const generatePradaImages = async (targetItemId?: string) => {
+    const targets = targetItemId ? apparelItems.filter(i => i.id === targetItemId) : apparelItems;
+    const validTargets = targets.filter(i => (i.selectedPradaThemes || []).length > 0);
+    if (validTargets.length === 0) return;
+    setIsGeneratingPrada(true);
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    try {
+      const logoBase64 = logo ? await fileToBase64(logo.file) : null;
+      for (const item of validTargets) {
+        const selectedIds = item.selectedPradaThemes || [];
+        const themesToGenerate = PRADA_THEMES.filter(p => selectedIds.includes(p.id));
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, pradaStatus: 'generating', pradaImages: [], pradaProgress: { current: 0, total: themesToGenerate.length } } : i));
+        const imageDataParts: { data: string; mimeType: string }[] = [];
+        for (const img of item.images) {
+          const base64 = await fileToBase64(img.file);
+          imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
+        }
+        const modelDescription = selectedGender === 'women'
+          ? "a single young Indian woman, age 22-28, sharp intellectual features, medium-brown skin, severe minimalist hair, no smile, deadpan editorial gaze"
+          : "a single young Indian man, age 22-28, sharp intellectual features, medium-brown skin, severe combed hair, deadpan editorial gaze";
+        const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
+        for (let pi = 0; pi < themesToGenerate.length; pi++) {
+          const theme = themesToGenerate[pi];
+          setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, pradaProgress: { current: pi, total: themesToGenerate.length } } : i));
+          const parts: any[] = imageDataParts.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } }));
+          if (logoBase64) parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
+          const priceCopy = item.price?.trim() ? `₹${item.price.trim().replace(/^₹\s*/, '')}` : '';
+          const prompt = `You are a Senior Conceptual Art Director creating a campaign image for VPPA Fashions in the spirit of Prada / Miu Miu under Raf Simons -- avant-garde, intellectual, surreal, color-blocked, minimal but provocative.
+
+FORMAT: 1:1 square.
+THEME: "${theme.label}" -- ${theme.mood}.
+BACKGROUND: ${theme.backgroundDescription}.
+SET: ${theme.setSetting}.
+
+MODEL:
+- ${modelDescription}.
+- Pose: ${theme.poseDirection}.
+- Wearing the EXACT apparel from the reference images -- reproduce the garment faithfully in cut, color, print, drape, fabric, hardware, stitching.
+
+LIGHTING: Flat institutional studio softbox light, very even, low contrast (1.5:1), 5500K neutral, almost shadowless. Feels like a museum or laboratory. Hard-edged garment silhouette readable at all times.
+
+COMPOSITION: Severe geometric balance, generous negative space, model centered or precisely off-center on a strong vertical axis. The image should feel like a designed object, not a photograph -- conceptual, deliberate.
+
+LOGO ONLY: Place the VPPA logo mark only (no wordmark, no text), tiny at ~5% canvas width, in the bottom-right corner, in a discreet color${logoBase64 ? ' -- use the provided VPPA logo faithfully' : ''}.
+${priceCopy ? `- A single tiny price line "${priceCopy}" directly below the logo, optical size ~40% of logo height.` : ''}
+
+STRICT RULES: No additional text, no slogans, no decoration. One model only. No props beyond the set described. Garment colors stay true.
+
+TECH: Photorealistic, sharp medium-format clarity, micro-grain, f/8 deep DOF, slight cool-cast institutional grade.
+
+MOOD REFERENCE: Prada SS24 / Miu Miu Pre-Spring campaigns, Steven Meisel for Prada, Raf Simons era institutional art-direction.
+
+Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
+          parts.push({ text: prompt });
+          try {
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } } });
+            let url = ''; let desc = '';
+            for (const p of response.candidates?.[0]?.content?.parts || []) {
+              if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
+              else if (p.text) desc = p.text;
+            }
+            if (url) {
+              generated.push({ themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA conceptual · ${theme.label}` } });
+              setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, pradaImages: [...generated] } : i));
+            }
+            await sleep(1000);
+          } catch (err) {
+            console.error(`Prada generation failed for ${theme.label}:`, err);
+            showToast('error', `${theme.label}: ${describeError(err)}`);
+          }
+        }
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, pradaStatus: generated.length > 0 ? 'completed' : 'error', pradaProgress: undefined } : i));
+      }
+    } finally { setIsGeneratingPrada(false); }
+  };
+
+  const generateDiorImages = async (targetItemId?: string) => {
+    const targets = targetItemId ? apparelItems.filter(i => i.id === targetItemId) : apparelItems;
+    const validTargets = targets.filter(i => (i.selectedDiorThemes || []).length > 0);
+    if (validTargets.length === 0) return;
+    setIsGeneratingDior(true);
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    try {
+      const logoBase64 = logo ? await fileToBase64(logo.file) : null;
+      for (const item of validTargets) {
+        const selectedIds = item.selectedDiorThemes || [];
+        const themesToGenerate = DIOR_THEMES.filter(p => selectedIds.includes(p.id));
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, diorStatus: 'generating', diorImages: [], diorProgress: { current: 0, total: themesToGenerate.length } } : i));
+        const imageDataParts: { data: string; mimeType: string }[] = [];
+        for (const img of item.images) {
+          const base64 = await fileToBase64(img.file);
+          imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
+        }
+        const modelDescription = selectedGender === 'women'
+          ? "a single young Indian woman, age 22-28, refined romantic features, medium-brown skin, softly styled dark hair, painterly haute couture beauty, subtle warm makeup"
+          : "a single young Indian man, age 22-28, classical aristocratic features, medium-brown skin, softly styled dark hair, painterly couture refinement";
+        const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
+        for (let pi = 0; pi < themesToGenerate.length; pi++) {
+          const theme = themesToGenerate[pi];
+          setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, diorProgress: { current: pi, total: themesToGenerate.length } } : i));
+          const parts: any[] = imageDataParts.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } }));
+          if (logoBase64) parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
+          const priceCopy = item.price?.trim() ? `₹${item.price.trim().replace(/^₹\s*/, '')}` : '';
+          const prompt = `You are a Senior Couture Art Director creating a romantic painterly campaign for VPPA Fashions in the spirit of Dior haute couture campaigns by Steven Meisel and Mert & Marcus -- painterly, romantic, classical, dreamy.
+
+FORMAT: 1:1 square.
+THEME: "${theme.label}" -- ${theme.mood}.
+LOCATION: ${theme.locationDescription}.
+PALETTE: ${theme.paletteDescription}.
+
+MODEL:
+- ${modelDescription}.
+- Pose: ${theme.poseDirection}.
+- Wearing the EXACT apparel from the reference images -- preserve every couture detail, fabric drape, embroidery, embellishment, color, print.
+
+LIGHTING: ${theme.lightingDescription}.
+
+GRADE: Painterly, soft warm color-grade evoking Renaissance oil painting -- creamy highlights, gentle warm shadows, fine film grain. Skin glows softly. Fabric reads as luxurious couture material.
+
+COMPOSITION: Classical balance, often slightly off-center, with the location framing the model like a Renaissance portrait. Generous breathing room. Romantic stillness.
+
+LOGO ONLY: Place the VPPA logo mark only (no wordmark, no text), small at ~6% canvas width, in the bottom-right corner, tone-on-tone discreet${logoBase64 ? ' -- use the provided VPPA logo faithfully' : ''}.
+${priceCopy ? `- A single tiny price line "${priceCopy}" directly below the logo in elegant serif small-caps, optical size ~40% of logo height.` : ''}
+
+STRICT RULES: No additional text or slogans. One model only. No anachronistic objects (phones, modern tech). Couture mood throughout.
+
+TECH: Photorealistic medium-format quality, painterly post grade, f/2.8 with soft creamy bokeh in backgrounds, microscopic skin and fabric texture preserved.
+
+MOOD REFERENCE: Dior haute couture campaigns, Steven Meisel for Dior, Lady Dior campaigns, classical Renaissance portraiture.
+
+Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
+          parts.push({ text: prompt });
+          try {
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } } });
+            let url = ''; let desc = '';
+            for (const p of response.candidates?.[0]?.content?.parts || []) {
+              if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
+              else if (p.text) desc = p.text;
+            }
+            if (url) {
+              generated.push({ themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA couture · ${theme.label}` } });
+              setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, diorImages: [...generated] } : i));
+            }
+            await sleep(1000);
+          } catch (err) {
+            console.error(`Dior generation failed for ${theme.label}:`, err);
+            showToast('error', `${theme.label}: ${describeError(err)}`);
+          }
+        }
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, diorStatus: generated.length > 0 ? 'completed' : 'error', diorProgress: undefined } : i));
+      }
+    } finally { setIsGeneratingDior(false); }
+  };
+
+  const generateJacquemusImages = async (targetItemId?: string) => {
+    const targets = targetItemId ? apparelItems.filter(i => i.id === targetItemId) : apparelItems;
+    const validTargets = targets.filter(i => (i.selectedJacquemusThemes || []).length > 0);
+    if (validTargets.length === 0) return;
+    setIsGeneratingJacquemus(true);
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    try {
+      const logoBase64 = logo ? await fileToBase64(logo.file) : null;
+      for (const item of validTargets) {
+        const selectedIds = item.selectedJacquemusThemes || [];
+        const themesToGenerate = JACQUEMUS_THEMES.filter(p => selectedIds.includes(p.id));
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, jacquemusStatus: 'generating', jacquemusImages: [], jacquemusProgress: { current: 0, total: themesToGenerate.length } } : i));
+        const imageDataParts: { data: string; mimeType: string }[] = [];
+        for (const img of item.images) {
+          const base64 = await fileToBase64(img.file);
+          imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
+        }
+        const modelDescription = selectedGender === 'women'
+          ? "a single young Indian woman, age 22-28, sun-kissed glowing features, medium-brown skin tanned warm, natural undone hair, fresh natural look"
+          : "a single young Indian man, age 22-28, sun-kissed features, medium-brown skin tanned warm, tousled natural hair, easy mediterranean charm";
+        const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
+        for (let pi = 0; pi < themesToGenerate.length; pi++) {
+          const theme = themesToGenerate[pi];
+          setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, jacquemusProgress: { current: pi, total: themesToGenerate.length } } : i));
+          const parts: any[] = imageDataParts.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } }));
+          if (logoBase64) parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
+          const priceCopy = item.price?.trim() ? `₹${item.price.trim().replace(/^₹\s*/, '')}` : '';
+          const prompt = `You are a Senior Mediterranean Lifestyle Art Director creating a sun-drenched campaign for VPPA Fashions in the spirit of Jacquemus -- south of France, surreal oversized props, golden warm light, joyful pastel summer.
+
+FORMAT: 1:1 square.
+THEME: "${theme.label}" -- ${theme.mood}.
+LOCATION: ${theme.locationDescription}.
+PALETTE: ${theme.palette}.
+
+MODEL:
+- ${modelDescription}.
+- Pose: ${theme.poseDirection}.
+- Wearing the EXACT apparel from the reference images -- preserve every detail of cut, color, print, drape, fabric.
+
+SURREAL OVERSIZE PROP (signature Jacquemus element):
+- ${theme.surrealProp}. The prop is exaggerated in scale -- 2-5x normal size -- giving the image a playful surrealist quality. The prop must look photorealistic, hand-held or naturally interacted with.
+
+LIGHTING: Warm golden-hour Mediterranean sun, 4500-5200K, soft directional sidelight from camera-left, warm shadows, gentle haze in the air. Sun-kissed skin glow.
+
+COMPOSITION: Slightly off-center, often using the surreal prop as a strong graphic element. Generous breathing room. Joyful, cinematic, carefree.
+
+LOGO ONLY: Place the VPPA logo mark only (no wordmark, no text), tiny at ~5% canvas width, bottom-right corner, in soft cream tone${logoBase64 ? ' -- use the provided VPPA logo faithfully' : ''}.
+${priceCopy ? `- A single tiny price line "${priceCopy}" directly below the logo, optical size ~40% of logo height.` : ''}
+
+STRICT RULES: No additional text or slogans. One model only. The surreal oversized prop MUST be present and obviously larger-than-life.
+
+TECH: Photorealistic 35mm film quality, slight warm grain, f/4 with creamy soft falloff, Kodak Portra 400 warmth, golden honey grade.
+
+MOOD REFERENCE: Jacquemus campaigns by Simon Porte Jacquemus, "Le Bambino" oversize prop campaigns, south of France lifestyle editorial.
+
+Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
+          parts.push({ text: prompt });
+          try {
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } } });
+            let url = ''; let desc = '';
+            for (const p of response.candidates?.[0]?.content?.parts || []) {
+              if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
+              else if (p.text) desc = p.text;
+            }
+            if (url) {
+              generated.push({ themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA riviera · ${theme.label}` } });
+              setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, jacquemusImages: [...generated] } : i));
+            }
+            await sleep(1000);
+          } catch (err) {
+            console.error(`Jacquemus generation failed for ${theme.label}:`, err);
+            showToast('error', `${theme.label}: ${describeError(err)}`);
+          }
+        }
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, jacquemusStatus: generated.length > 0 ? 'completed' : 'error', jacquemusProgress: undefined } : i));
+      }
+    } finally { setIsGeneratingJacquemus(false); }
+  };
+
+  const generateBurberryImages = async (targetItemId?: string) => {
+    const targets = targetItemId ? apparelItems.filter(i => i.id === targetItemId) : apparelItems;
+    const validTargets = targets.filter(i => (i.selectedBurberryThemes || []).length > 0);
+    if (validTargets.length === 0) return;
+    setIsGeneratingBurberry(true);
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    try {
+      const logoBase64 = logo ? await fileToBase64(logo.file) : null;
+      for (const item of validTargets) {
+        const selectedIds = item.selectedBurberryThemes || [];
+        const themesToGenerate = BURBERRY_THEMES.filter(p => selectedIds.includes(p.id));
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, burberryStatus: 'generating', burberryImages: [], burberryProgress: { current: 0, total: themesToGenerate.length } } : i));
+        const imageDataParts: { data: string; mimeType: string }[] = [];
+        for (const img of item.images) {
+          const base64 = await fileToBase64(img.file);
+          imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
+        }
+        const modelDescription = selectedGender === 'women'
+          ? "a single young Indian woman, age 22-28, refined natural features, medium-brown skin, wind-tousled dark hair, no smile, stoic British editorial gaze"
+          : "a single young Indian man, age 22-28, refined natural features, medium-brown skin, wind-tousled dark hair, stoic British editorial gaze";
+        const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
+        for (let pi = 0; pi < themesToGenerate.length; pi++) {
+          const theme = themesToGenerate[pi];
+          setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, burberryProgress: { current: pi, total: themesToGenerate.length } } : i));
+          const parts: any[] = imageDataParts.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } }));
+          if (logoBase64) parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
+          const priceCopy = item.price?.trim() ? `₹${item.price.trim().replace(/^₹\s*/, '')}` : '';
+          const prompt = `You are a Senior British Heritage Art Director creating a campaign for VPPA Fashions in the spirit of Burberry -- British weather, trench-coat heritage, atmospheric countryside, cinematic landscape.
+
+FORMAT: 1:1 square.
+THEME: "${theme.label}" -- ${theme.mood}.
+LOCATION: ${theme.locationDescription}.
+PALETTE: ${theme.paletteDescription}.
+WEATHER / ATMOSPHERE: ${theme.weatherAtmosphere}.
+
+MODEL:
+- ${modelDescription}.
+- Pose: ${theme.poseDirection}.
+- Wearing the EXACT apparel from the reference images -- preserve every detail of cut, color, fabric, drape, lining, hardware, stitching.
+
+LIGHTING: Soft natural British overcast diffusion, 5800-6500K cool, low contrast 1.5:1 with gentle directional shadow. Atmospheric haze where weather permits, occasionally a warm golden shaft breaking through clouds.
+
+COMPOSITION: Wide environmental shot showing the model integrated into the landscape. Often using rule-of-thirds with the model on one side and the dramatic landscape filling the rest. Cinematic mood.
+
+LOGO ONLY: Place the VPPA logo mark only (no wordmark, no text), small at ~6% canvas width, bottom-right corner, in a tone that complements the scene${logoBase64 ? ' -- use the provided VPPA logo faithfully' : ''}.
+${priceCopy ? `- A single tiny price line "${priceCopy}" directly below the logo in clean serif small-caps, optical size ~40% of logo height.` : ''}
+
+STRICT RULES: No additional text or slogans. One model only. The British weather/landscape MUST be the second hero of the image. No anachronistic modern objects.
+
+TECH: Photorealistic, slight cool British grade, fine 35mm grain, f/4 medium-format quality, atmospheric depth, microscopic fabric detail.
+
+MOOD REFERENCE: Burberry campaigns by Mario Testino and Christopher Bailey era, "Brit" Burberry heritage, cinematic British countryside editorials.
+
+Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
+          parts.push({ text: prompt });
+          try {
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } } });
+            let url = ''; let desc = '';
+            for (const p of response.candidates?.[0]?.content?.parts || []) {
+              if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
+              else if (p.text) desc = p.text;
+            }
+            if (url) {
+              generated.push({ themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA heritage UK · ${theme.label}` } });
+              setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, burberryImages: [...generated] } : i));
+            }
+            await sleep(1000);
+          } catch (err) {
+            console.error(`Burberry generation failed for ${theme.label}:`, err);
+            showToast('error', `${theme.label}: ${describeError(err)}`);
+          }
+        }
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, burberryStatus: generated.length > 0 ? 'completed' : 'error', burberryProgress: undefined } : i));
+      }
+    } finally { setIsGeneratingBurberry(false); }
+  };
+
+  const generateBalenciagaImages = async (targetItemId?: string) => {
+    const targets = targetItemId ? apparelItems.filter(i => i.id === targetItemId) : apparelItems;
+    const validTargets = targets.filter(i => (i.selectedBalenciagaThemes || []).length > 0);
+    if (validTargets.length === 0) return;
+    setIsGeneratingBalenciaga(true);
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    try {
+      const logoBase64 = logo ? await fileToBase64(logo.file) : null;
+      for (const item of validTargets) {
+        const selectedIds = item.selectedBalenciagaThemes || [];
+        const themesToGenerate = BALENCIAGA_THEMES.filter(p => selectedIds.includes(p.id));
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, balenciagaStatus: 'generating', balenciagaImages: [], balenciagaProgress: { current: 0, total: themesToGenerate.length } } : i));
+        const imageDataParts: { data: string; mimeType: string }[] = [];
+        for (const img of item.images) {
+          const base64 = await fileToBase64(img.file);
+          imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
+        }
+        const modelDescription = selectedGender === 'women'
+          ? "a single young Indian woman, age 22-28, severe angular features, medium-brown skin, slick straight dark hair pulled back, dead-calm dystopian gaze"
+          : "a single young Indian man, age 22-28, severe angular features, medium-brown skin, slick straight dark hair, dead-calm dystopian gaze";
+        const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
+        for (let pi = 0; pi < themesToGenerate.length; pi++) {
+          const theme = themesToGenerate[pi];
+          setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, balenciagaProgress: { current: pi, total: themesToGenerate.length } } : i));
+          const parts: any[] = imageDataParts.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } }));
+          if (logoBase64) parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
+          const priceCopy = item.price?.trim() ? `₹${item.price.trim().replace(/^₹\s*/, '')}` : '';
+          const prompt = `You are a Senior Dystopian Art Director creating a campaign for VPPA Fashions in the spirit of Balenciaga under Demna -- brutalist, dystopian, post-apocalyptic, oversized silhouettes, cold and cinematic.
+
+FORMAT: 1:1 square.
+THEME: "${theme.label}" -- ${theme.mood}.
+ENVIRONMENT: ${theme.environmentDescription}.
+PALETTE: ${theme.paletteDescription}.
+WEATHER / ATMOSPHERE: ${theme.weatherAtmosphere}.
+
+MODEL:
+- ${modelDescription}.
+- Pose: ${theme.poseDirection}.
+- Wearing the EXACT apparel from the reference images -- preserve every detail of cut, color, drape, fabric, hardware. Where possible the silhouette should read OVERSIZED and dramatic against the environment.
+
+LIGHTING: ${theme.lightingDescription}.
+
+GRADE: Cool desaturated dystopian color grade, crushed blacks, slightly raised mid-greens, slight teal-orange split-tone where weather permits, cinematic letterboxed mood.
+
+COMPOSITION: Wide environmental shot establishing the dystopian scale. Model often centered or symmetrically placed making the scene feel staged, monumental, surreal. Negative space is heavy.
+
+LOGO ONLY: Place the VPPA logo mark only (no wordmark, no text), small at ~6% canvas width, bottom-right corner, in a tone that just barely reads against the scene${logoBase64 ? ' -- use the provided VPPA logo faithfully' : ''}.
+${priceCopy ? `- A single tiny price line "${priceCopy}" directly below the logo in industrial mono small-caps, optical size ~40% of logo height.` : ''}
+
+STRICT RULES: No additional text, no slogans. One model only. Dystopian / post-apocalyptic atmosphere MUST dominate. No bright cheerful colors. No anachronistic glamour.
+
+TECH: Photorealistic cinematic CCTV-aesthetic quality, deep grain, f/2.8-f/4 with subtle depth falloff, motion-implied stillness.
+
+MOOD REFERENCE: Balenciaga campaigns by Demna Gvasalia, "Snow" and "Mud" runways, post-apocalyptic editorial work, Vetements early campaigns.
+
+Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
+          parts.push({ text: prompt });
+          try {
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } } });
+            let url = ''; let desc = '';
+            for (const p of response.candidates?.[0]?.content?.parts || []) {
+              if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
+              else if (p.text) desc = p.text;
+            }
+            if (url) {
+              generated.push({ themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA dystopia · ${theme.label}` } });
+              setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, balenciagaImages: [...generated] } : i));
+            }
+            await sleep(1000);
+          } catch (err) {
+            console.error(`Balenciaga generation failed for ${theme.label}:`, err);
+            showToast('error', `${theme.label}: ${describeError(err)}`);
+          }
+        }
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, balenciagaStatus: generated.length > 0 ? 'completed' : 'error', balenciagaProgress: undefined } : i));
+      }
+    } finally { setIsGeneratingBalenciaga(false); }
+  };
+
   const totalViews = apparelItems.reduce((acc, i) => acc + i.views.length, 0);
   const currentViewTypes = getViewTypes(selectedGender);
   const totalExpected = apparelItems.length * currentViewTypes.length;
@@ -2496,6 +3055,11 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                   {campaignTab === 'hermes' && 'Hermes atelier style -- product still life on flat painted ground with hand-drawn ink marginalia, anti-AI craft'}
                   {campaignTab === 'bottega' && 'Bottega Veneta / Loro Piana / The Row quiet luxury -- restraint, craft focus, no loud branding, soft natural light'}
                   {campaignTab === 'saintlaurent' && 'Saint Laurent rock-noir -- monochrome high-contrast cinema, hard light, defiant attitude'}
+                  {campaignTab === 'prada' && 'Prada / Miu Miu conceptual -- avant-garde, surreal, color-blocked, intellectual provocation'}
+                  {campaignTab === 'dior' && 'Dior couture romance -- painterly Renaissance haute couture, classical settings, dreamy soft light'}
+                  {campaignTab === 'jacquemus' && 'Jacquemus riviera -- sun-drenched south of France with surreal oversized props, joyful pastel summer'}
+                  {campaignTab === 'burberry' && 'Burberry British heritage -- foggy moors, rainy cobblestones, trench coat heritage, atmospheric British countryside'}
+                  {campaignTab === 'balenciaga' && 'Balenciaga dystopian -- brutalist post-apocalyptic, oversized silhouettes, cinematic dystopia'}
                 </p>
               </div>
               {(() => {
@@ -2571,14 +3135,54 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                     </button>
                   );
                 }
-                const totalSelected = apparelItems.reduce((sum, i) => sum + (i.selectedSaintLaurentThemes?.length || 0), 0);
+                if (campaignTab === 'saintlaurent') {
+                  const totalSelected = apparelItems.reduce((sum, i) => sum + (i.selectedSaintLaurentThemes?.length || 0), 0);
+                  return (
+                    <button
+                      onClick={() => generateSaintLaurentImages()}
+                      disabled={totalSelected === 0 || isGeneratingSaintLaurent || isGenerating}
+                      className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-black to-gray-800 hover:from-black hover:to-gray-900 text-white shadow-md shadow-gray-900/30"
+                    >
+                      {isGeneratingSaintLaurent ? (<><Loader2 className="w-4 h-4 animate-spin" />Creating all...</>) : (<><Sparkles className="w-4 h-4" />Generate All {totalSelected > 0 ? `(${totalSelected})` : ''}</>)}
+                    </button>
+                  );
+                }
+                if (campaignTab === 'prada') {
+                  const totalSelected = apparelItems.reduce((sum, i) => sum + (i.selectedPradaThemes?.length || 0), 0);
+                  return (
+                    <button onClick={() => generatePradaImages()} disabled={totalSelected === 0 || isGeneratingPrada || isGenerating} className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-lime-500 to-yellow-500 hover:from-lime-600 hover:to-yellow-600 text-white shadow-md shadow-lime-500/20">
+                      {isGeneratingPrada ? (<><Loader2 className="w-4 h-4 animate-spin" />Creating all...</>) : (<><Sparkles className="w-4 h-4" />Generate All {totalSelected > 0 ? `(${totalSelected})` : ''}</>)}
+                    </button>
+                  );
+                }
+                if (campaignTab === 'dior') {
+                  const totalSelected = apparelItems.reduce((sum, i) => sum + (i.selectedDiorThemes?.length || 0), 0);
+                  return (
+                    <button onClick={() => generateDiorImages()} disabled={totalSelected === 0 || isGeneratingDior || isGenerating} className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-rose-300 to-pink-400 hover:from-rose-400 hover:to-pink-500 text-white shadow-md shadow-rose-300/30">
+                      {isGeneratingDior ? (<><Loader2 className="w-4 h-4 animate-spin" />Creating all...</>) : (<><Sparkles className="w-4 h-4" />Generate All {totalSelected > 0 ? `(${totalSelected})` : ''}</>)}
+                    </button>
+                  );
+                }
+                if (campaignTab === 'jacquemus') {
+                  const totalSelected = apparelItems.reduce((sum, i) => sum + (i.selectedJacquemusThemes?.length || 0), 0);
+                  return (
+                    <button onClick={() => generateJacquemusImages()} disabled={totalSelected === 0 || isGeneratingJacquemus || isGenerating} className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-yellow-400 to-amber-400 hover:from-yellow-500 hover:to-amber-500 text-white shadow-md shadow-yellow-400/30">
+                      {isGeneratingJacquemus ? (<><Loader2 className="w-4 h-4 animate-spin" />Creating all...</>) : (<><Sparkles className="w-4 h-4" />Generate All {totalSelected > 0 ? `(${totalSelected})` : ''}</>)}
+                    </button>
+                  );
+                }
+                if (campaignTab === 'burberry') {
+                  const totalSelected = apparelItems.reduce((sum, i) => sum + (i.selectedBurberryThemes?.length || 0), 0);
+                  return (
+                    <button onClick={() => generateBurberryImages()} disabled={totalSelected === 0 || isGeneratingBurberry || isGenerating} className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-stone-600 to-stone-700 hover:from-stone-700 hover:to-stone-800 text-white shadow-md shadow-stone-500/20">
+                      {isGeneratingBurberry ? (<><Loader2 className="w-4 h-4 animate-spin" />Creating all...</>) : (<><Sparkles className="w-4 h-4" />Generate All {totalSelected > 0 ? `(${totalSelected})` : ''}</>)}
+                    </button>
+                  );
+                }
+                const totalSelected = apparelItems.reduce((sum, i) => sum + (i.selectedBalenciagaThemes?.length || 0), 0);
                 return (
-                  <button
-                    onClick={() => generateSaintLaurentImages()}
-                    disabled={totalSelected === 0 || isGeneratingSaintLaurent || isGenerating}
-                    className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-black to-gray-800 hover:from-black hover:to-gray-900 text-white shadow-md shadow-gray-900/30"
-                  >
-                    {isGeneratingSaintLaurent ? (<><Loader2 className="w-4 h-4 animate-spin" />Creating all...</>) : (<><Sparkles className="w-4 h-4" />Generate All {totalSelected > 0 ? `(${totalSelected})` : ''}</>)}
+                  <button onClick={() => generateBalenciagaImages()} disabled={totalSelected === 0 || isGeneratingBalenciaga || isGenerating} className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-zinc-700 to-zinc-900 hover:from-zinc-800 hover:to-black text-white shadow-md shadow-zinc-900/30">
+                    {isGeneratingBalenciaga ? (<><Loader2 className="w-4 h-4 animate-spin" />Creating all...</>) : (<><Sparkles className="w-4 h-4" />Generate All {totalSelected > 0 ? `(${totalSelected})` : ''}</>)}
                   </button>
                 );
               })()}
@@ -2655,6 +3259,56 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                 <ImageIcon className="w-3.5 h-3.5" />
                 Rock Noir
                 <span className="text-[9px] text-gray-400 font-normal">Saint Laurent</span>
+              </button>
+              <button
+                onClick={() => setCampaignTab('prada')}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+                  campaignTab === 'prada' ? 'bg-white shadow-sm border border-gray-200 text-gray-900' : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Conceptual
+                <span className="text-[9px] text-gray-400 font-normal">Prada / Miu Miu</span>
+              </button>
+              <button
+                onClick={() => setCampaignTab('dior')}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+                  campaignTab === 'dior' ? 'bg-white shadow-sm border border-gray-200 text-gray-900' : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Couture Romance
+                <span className="text-[9px] text-gray-400 font-normal">Dior</span>
+              </button>
+              <button
+                onClick={() => setCampaignTab('jacquemus')}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+                  campaignTab === 'jacquemus' ? 'bg-white shadow-sm border border-gray-200 text-gray-900' : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                Riviera
+                <span className="text-[9px] text-gray-400 font-normal">Jacquemus</span>
+              </button>
+              <button
+                onClick={() => setCampaignTab('burberry')}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+                  campaignTab === 'burberry' ? 'bg-white shadow-sm border border-gray-200 text-gray-900' : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                British Heritage
+                <span className="text-[9px] text-gray-400 font-normal">Burberry</span>
+              </button>
+              <button
+                onClick={() => setCampaignTab('balenciaga')}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+                  campaignTab === 'balenciaga' ? 'bg-white shadow-sm border border-gray-200 text-gray-900' : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5" />
+                Dystopian
+                <span className="text-[9px] text-gray-400 font-normal">Balenciaga</span>
               </button>
             </div>
 
@@ -3818,6 +4472,501 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                                   <p className={`text-[10px] mt-1.5 text-center font-medium truncate ${
                                     generated ? 'text-gray-500' : isCurrent ? 'text-gray-800' : 'text-gray-300'
                                   }`}>{theme.label}</p>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            )}
+
+            {campaignTab === 'prada' && (
+            <div className="space-y-6">
+              {apparelItems.map((item) => {
+                const selectedThemes = item.selectedPradaThemes || [];
+                const hasSelection = selectedThemes.length > 0;
+                const isItemGenerating = item.pradaStatus === 'generating';
+                const images = item.pradaImages || [];
+                return (
+                  <div key={`prada-${item.id}`} className="glass rounded-2xl overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+                      <img src={item.images[0].preview} alt="ref" className="w-11 h-11 rounded-lg object-cover border border-gray-200" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-700 truncate">Conceptual</span>
+                          {item.uploadMode === 'printed' && (<span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 font-medium">Printed</span>)}
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">{selectedThemes.length} selected</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">{item.images.length} reference{item.images.length > 1 ? 's' : ''} · Prada / Miu Miu avant-garde · logo only</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-gray-200 focus-within:border-lime-500 focus-within:ring-2 focus-within:ring-lime-100 transition-all">
+                          <span className="text-xs font-semibold text-gray-400">₹</span>
+                          <input type="text" inputMode="decimal" value={item.price || ''} onChange={(e) => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, price: e.target.value.replace(/[^\d.,]/g, '') } : i))} placeholder="Price" className="w-20 text-xs text-gray-700 placeholder:text-gray-300 bg-transparent focus:outline-none" />
+                        </div>
+                        <button onClick={() => generatePradaImages(item.id)} disabled={!hasSelection || isItemGenerating || isGenerating || isGeneratingPrada} className="px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-lime-500 to-yellow-500 hover:from-lime-600 hover:to-yellow-600 text-white shadow-sm">
+                          {isItemGenerating ? (<><Loader2 className="w-3.5 h-3.5 animate-spin" />{item.pradaProgress ? `${item.pradaProgress.current + 1}/${item.pradaProgress.total}` : 'Creating'}</>) : (<><Sparkles className="w-3.5 h-3.5" />Generate {hasSelection ? `(${selectedThemes.length})` : ''}</>)}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="px-5 py-4 border-b border-gray-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Select Conceptual Themes (multiple)</label>
+                        <div className="flex gap-2 text-[10px]">
+                          <button onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedPradaThemes: PRADA_THEMES.map(p => p.id) } : i))} className="text-gray-400 hover:text-gray-600">Select all</button>
+                          <span className="text-gray-200">·</span>
+                          <button onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedPradaThemes: [] } : i))} className="text-gray-400 hover:text-gray-600">Clear</button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                        {PRADA_THEMES.map(theme => {
+                          const isSelected = selectedThemes.includes(theme.id);
+                          return (
+                            <button key={theme.id} onClick={() => togglePradaTheme(item.id, theme.id)} disabled={isItemGenerating} className={`p-2 rounded-lg transition-all duration-200 border disabled:opacity-50 text-left ${isSelected ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-lime-400'}`}>
+                              <div className="w-full aspect-square rounded-md mb-1.5 border" style={{ backgroundColor: theme.backgroundHex, borderColor: isSelected ? 'rgba(255,255,255,0.2)' : '#e5e7eb' }} />
+                              <p className="text-[10px] font-semibold truncate">{theme.label}</p>
+                              <p className={`text-[8px] truncate ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>{theme.mood}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="p-5">
+                      {images.length === 0 && !isItemGenerating ? (
+                        <div className="py-10 flex flex-col items-center justify-center gap-2 text-center">
+                          <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center"><Layers className="w-5 h-5 text-gray-300" /></div>
+                          <p className="text-xs text-gray-400">Select one or more conceptual themes, then hit Generate</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {(() => {
+                            const selectedDefs = PRADA_THEMES.filter(p => selectedThemes.includes(p.id));
+                            const total = isItemGenerating && item.pradaProgress ? item.pradaProgress.total : selectedDefs.length;
+                            const currentIdx = item.pradaProgress?.current ?? -1;
+                            return selectedDefs.slice(0, Math.max(total, images.length)).map((theme, idx) => {
+                              const generated = images.find(c => c.themeId === theme.id);
+                              const isCurrent = isItemGenerating && idx === currentIdx;
+                              const isWaiting = isItemGenerating && idx > currentIdx && !generated;
+                              return (
+                                <div key={theme.id} className="group">
+                                  <div className={`aspect-square rounded-xl overflow-hidden relative border transition-all ${generated ? 'border-gray-200 hover:border-gray-300' : 'border-gray-100 bg-gray-50/50'} ${isCurrent ? 'ring-1 ring-lime-400' : ''}`}>
+                                    {generated ? (
+                                      <>
+                                        <img src={generated.view.url} alt={theme.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
+                                          <button onClick={() => downloadImage(generated.view.url, `VPPA_Conceptual_${theme.id}_${item.id}.png`)} className="w-full py-1.5 rounded-lg bg-white text-gray-700 text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 shadow-sm"><Download className="w-3 h-3" />Save</button>
+                                        </div>
+                                      </>
+                                    ) : isCurrent ? (
+                                      <div className="w-full h-full flex flex-col items-center justify-center gap-1.5"><Loader2 className="w-5 h-5 animate-spin text-lime-600" /><div className="w-8 h-0.5 rounded-full bg-lime-100 overflow-hidden"><div className="h-full bg-lime-500 rounded-full shimmer" style={{ width: '60%' }} /></div></div>
+                                    ) : isWaiting ? (
+                                      <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-gray-200 animate-pulse" /></div>
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center"><div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center"><ImageIcon className="w-3 h-3 text-gray-300" /></div></div>
+                                    )}
+                                  </div>
+                                  <p className={`text-[10px] mt-1.5 text-center font-medium truncate ${generated ? 'text-gray-500' : isCurrent ? 'text-lime-700' : 'text-gray-300'}`}>{theme.label}</p>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            )}
+
+            {campaignTab === 'dior' && (
+            <div className="space-y-6">
+              {apparelItems.map((item) => {
+                const selectedThemes = item.selectedDiorThemes || [];
+                const hasSelection = selectedThemes.length > 0;
+                const isItemGenerating = item.diorStatus === 'generating';
+                const images = item.diorImages || [];
+                return (
+                  <div key={`dior-${item.id}`} className="glass rounded-2xl overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+                      <img src={item.images[0].preview} alt="ref" className="w-11 h-11 rounded-lg object-cover border border-gray-200" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-700 truncate">Couture Romance</span>
+                          {item.uploadMode === 'printed' && (<span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 font-medium">Printed</span>)}
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">{selectedThemes.length} selected</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">{item.images.length} reference{item.images.length > 1 ? 's' : ''} · Dior haute couture painterly · logo only</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-gray-200 focus-within:border-rose-300 focus-within:ring-2 focus-within:ring-rose-100 transition-all">
+                          <span className="text-xs font-semibold text-gray-400">₹</span>
+                          <input type="text" inputMode="decimal" value={item.price || ''} onChange={(e) => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, price: e.target.value.replace(/[^\d.,]/g, '') } : i))} placeholder="Price" className="w-20 text-xs text-gray-700 placeholder:text-gray-300 bg-transparent focus:outline-none" />
+                        </div>
+                        <button onClick={() => generateDiorImages(item.id)} disabled={!hasSelection || isItemGenerating || isGenerating || isGeneratingDior} className="px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-rose-300 to-pink-400 hover:from-rose-400 hover:to-pink-500 text-white shadow-sm">
+                          {isItemGenerating ? (<><Loader2 className="w-3.5 h-3.5 animate-spin" />{item.diorProgress ? `${item.diorProgress.current + 1}/${item.diorProgress.total}` : 'Creating'}</>) : (<><Sparkles className="w-3.5 h-3.5" />Generate {hasSelection ? `(${selectedThemes.length})` : ''}</>)}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="px-5 py-4 border-b border-gray-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Select Couture Locations (multiple)</label>
+                        <div className="flex gap-2 text-[10px]">
+                          <button onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedDiorThemes: DIOR_THEMES.map(p => p.id) } : i))} className="text-gray-400 hover:text-gray-600">Select all</button>
+                          <span className="text-gray-200">·</span>
+                          <button onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedDiorThemes: [] } : i))} className="text-gray-400 hover:text-gray-600">Clear</button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                        {DIOR_THEMES.map(theme => {
+                          const isSelected = selectedThemes.includes(theme.id);
+                          return (
+                            <button key={theme.id} onClick={() => toggleDiorTheme(item.id, theme.id)} disabled={isItemGenerating} className={`p-2 rounded-lg transition-all duration-200 border disabled:opacity-50 text-left ${isSelected ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-rose-300'}`}>
+                              <div className="w-full aspect-square rounded-md mb-1.5 border" style={{ backgroundColor: theme.paletteHex, borderColor: isSelected ? 'rgba(255,255,255,0.2)' : '#e5e7eb' }} />
+                              <p className="text-[10px] font-semibold truncate">{theme.label}</p>
+                              <p className={`text-[8px] truncate ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>{theme.mood}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="p-5">
+                      {images.length === 0 && !isItemGenerating ? (
+                        <div className="py-10 flex flex-col items-center justify-center gap-2 text-center">
+                          <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center"><Sparkles className="w-5 h-5 text-gray-300" /></div>
+                          <p className="text-xs text-gray-400">Select one or more couture locations, then hit Generate</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {(() => {
+                            const selectedDefs = DIOR_THEMES.filter(p => selectedThemes.includes(p.id));
+                            const total = isItemGenerating && item.diorProgress ? item.diorProgress.total : selectedDefs.length;
+                            const currentIdx = item.diorProgress?.current ?? -1;
+                            return selectedDefs.slice(0, Math.max(total, images.length)).map((theme, idx) => {
+                              const generated = images.find(c => c.themeId === theme.id);
+                              const isCurrent = isItemGenerating && idx === currentIdx;
+                              const isWaiting = isItemGenerating && idx > currentIdx && !generated;
+                              return (
+                                <div key={theme.id} className="group">
+                                  <div className={`aspect-square rounded-xl overflow-hidden relative border transition-all ${generated ? 'border-gray-200 hover:border-gray-300' : 'border-gray-100 bg-gray-50/50'} ${isCurrent ? 'ring-1 ring-rose-300' : ''}`}>
+                                    {generated ? (
+                                      <>
+                                        <img src={generated.view.url} alt={theme.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
+                                          <button onClick={() => downloadImage(generated.view.url, `VPPA_Couture_${theme.id}_${item.id}.png`)} className="w-full py-1.5 rounded-lg bg-white text-gray-700 text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 shadow-sm"><Download className="w-3 h-3" />Save</button>
+                                        </div>
+                                      </>
+                                    ) : isCurrent ? (
+                                      <div className="w-full h-full flex flex-col items-center justify-center gap-1.5"><Loader2 className="w-5 h-5 animate-spin text-rose-400" /><div className="w-8 h-0.5 rounded-full bg-rose-100 overflow-hidden"><div className="h-full bg-rose-400 rounded-full shimmer" style={{ width: '60%' }} /></div></div>
+                                    ) : isWaiting ? (
+                                      <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-gray-200 animate-pulse" /></div>
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center"><div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center"><ImageIcon className="w-3 h-3 text-gray-300" /></div></div>
+                                    )}
+                                  </div>
+                                  <p className={`text-[10px] mt-1.5 text-center font-medium truncate ${generated ? 'text-gray-500' : isCurrent ? 'text-rose-500' : 'text-gray-300'}`}>{theme.label}</p>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            )}
+
+            {campaignTab === 'jacquemus' && (
+            <div className="space-y-6">
+              {apparelItems.map((item) => {
+                const selectedThemes = item.selectedJacquemusThemes || [];
+                const hasSelection = selectedThemes.length > 0;
+                const isItemGenerating = item.jacquemusStatus === 'generating';
+                const images = item.jacquemusImages || [];
+                return (
+                  <div key={`jacquemus-${item.id}`} className="glass rounded-2xl overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+                      <img src={item.images[0].preview} alt="ref" className="w-11 h-11 rounded-lg object-cover border border-gray-200" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-700 truncate">Riviera</span>
+                          {item.uploadMode === 'printed' && (<span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 font-medium">Printed</span>)}
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">{selectedThemes.length} selected</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">{item.images.length} reference{item.images.length > 1 ? 's' : ''} · Jacquemus south of France · logo only</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-gray-200 focus-within:border-yellow-400 focus-within:ring-2 focus-within:ring-yellow-100 transition-all">
+                          <span className="text-xs font-semibold text-gray-400">₹</span>
+                          <input type="text" inputMode="decimal" value={item.price || ''} onChange={(e) => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, price: e.target.value.replace(/[^\d.,]/g, '') } : i))} placeholder="Price" className="w-20 text-xs text-gray-700 placeholder:text-gray-300 bg-transparent focus:outline-none" />
+                        </div>
+                        <button onClick={() => generateJacquemusImages(item.id)} disabled={!hasSelection || isItemGenerating || isGenerating || isGeneratingJacquemus} className="px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-yellow-400 to-amber-400 hover:from-yellow-500 hover:to-amber-500 text-white shadow-sm">
+                          {isItemGenerating ? (<><Loader2 className="w-3.5 h-3.5 animate-spin" />{item.jacquemusProgress ? `${item.jacquemusProgress.current + 1}/${item.jacquemusProgress.total}` : 'Creating'}</>) : (<><Sparkles className="w-3.5 h-3.5" />Generate {hasSelection ? `(${selectedThemes.length})` : ''}</>)}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="px-5 py-4 border-b border-gray-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Select Riviera Locations (multiple)</label>
+                        <div className="flex gap-2 text-[10px]">
+                          <button onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedJacquemusThemes: JACQUEMUS_THEMES.map(p => p.id) } : i))} className="text-gray-400 hover:text-gray-600">Select all</button>
+                          <span className="text-gray-200">·</span>
+                          <button onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedJacquemusThemes: [] } : i))} className="text-gray-400 hover:text-gray-600">Clear</button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                        {JACQUEMUS_THEMES.map(theme => {
+                          const isSelected = selectedThemes.includes(theme.id);
+                          return (
+                            <button key={theme.id} onClick={() => toggleJacquemusTheme(item.id, theme.id)} disabled={isItemGenerating} className={`p-2 rounded-lg transition-all duration-200 border disabled:opacity-50 text-left ${isSelected ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-yellow-400'}`}>
+                              <div className="w-full aspect-square rounded-md mb-1.5 border" style={{ backgroundColor: theme.paletteHex, borderColor: isSelected ? 'rgba(255,255,255,0.2)' : '#e5e7eb' }} />
+                              <p className="text-[10px] font-semibold truncate">{theme.label}</p>
+                              <p className={`text-[8px] truncate ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>{theme.mood}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="p-5">
+                      {images.length === 0 && !isItemGenerating ? (
+                        <div className="py-10 flex flex-col items-center justify-center gap-2 text-center">
+                          <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center"><Camera className="w-5 h-5 text-gray-300" /></div>
+                          <p className="text-xs text-gray-400">Select one or more riviera locations, then hit Generate</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {(() => {
+                            const selectedDefs = JACQUEMUS_THEMES.filter(p => selectedThemes.includes(p.id));
+                            const total = isItemGenerating && item.jacquemusProgress ? item.jacquemusProgress.total : selectedDefs.length;
+                            const currentIdx = item.jacquemusProgress?.current ?? -1;
+                            return selectedDefs.slice(0, Math.max(total, images.length)).map((theme, idx) => {
+                              const generated = images.find(c => c.themeId === theme.id);
+                              const isCurrent = isItemGenerating && idx === currentIdx;
+                              const isWaiting = isItemGenerating && idx > currentIdx && !generated;
+                              return (
+                                <div key={theme.id} className="group">
+                                  <div className={`aspect-square rounded-xl overflow-hidden relative border transition-all ${generated ? 'border-gray-200 hover:border-gray-300' : 'border-gray-100 bg-gray-50/50'} ${isCurrent ? 'ring-1 ring-yellow-400' : ''}`}>
+                                    {generated ? (
+                                      <>
+                                        <img src={generated.view.url} alt={theme.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
+                                          <button onClick={() => downloadImage(generated.view.url, `VPPA_Riviera_${theme.id}_${item.id}.png`)} className="w-full py-1.5 rounded-lg bg-white text-gray-700 text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 shadow-sm"><Download className="w-3 h-3" />Save</button>
+                                        </div>
+                                      </>
+                                    ) : isCurrent ? (
+                                      <div className="w-full h-full flex flex-col items-center justify-center gap-1.5"><Loader2 className="w-5 h-5 animate-spin text-yellow-500" /><div className="w-8 h-0.5 rounded-full bg-yellow-100 overflow-hidden"><div className="h-full bg-yellow-500 rounded-full shimmer" style={{ width: '60%' }} /></div></div>
+                                    ) : isWaiting ? (
+                                      <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-gray-200 animate-pulse" /></div>
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center"><div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center"><ImageIcon className="w-3 h-3 text-gray-300" /></div></div>
+                                    )}
+                                  </div>
+                                  <p className={`text-[10px] mt-1.5 text-center font-medium truncate ${generated ? 'text-gray-500' : isCurrent ? 'text-yellow-600' : 'text-gray-300'}`}>{theme.label}</p>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            )}
+
+            {campaignTab === 'burberry' && (
+            <div className="space-y-6">
+              {apparelItems.map((item) => {
+                const selectedThemes = item.selectedBurberryThemes || [];
+                const hasSelection = selectedThemes.length > 0;
+                const isItemGenerating = item.burberryStatus === 'generating';
+                const images = item.burberryImages || [];
+                return (
+                  <div key={`burberry-${item.id}`} className="glass rounded-2xl overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+                      <img src={item.images[0].preview} alt="ref" className="w-11 h-11 rounded-lg object-cover border border-gray-200" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-700 truncate">British Heritage</span>
+                          {item.uploadMode === 'printed' && (<span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 font-medium">Printed</span>)}
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">{selectedThemes.length} selected</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">{item.images.length} reference{item.images.length > 1 ? 's' : ''} · Burberry trench-coat heritage · logo only</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-gray-200 focus-within:border-stone-500 focus-within:ring-2 focus-within:ring-stone-100 transition-all">
+                          <span className="text-xs font-semibold text-gray-400">₹</span>
+                          <input type="text" inputMode="decimal" value={item.price || ''} onChange={(e) => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, price: e.target.value.replace(/[^\d.,]/g, '') } : i))} placeholder="Price" className="w-20 text-xs text-gray-700 placeholder:text-gray-300 bg-transparent focus:outline-none" />
+                        </div>
+                        <button onClick={() => generateBurberryImages(item.id)} disabled={!hasSelection || isItemGenerating || isGenerating || isGeneratingBurberry} className="px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-stone-600 to-stone-700 hover:from-stone-700 hover:to-stone-800 text-white shadow-sm">
+                          {isItemGenerating ? (<><Loader2 className="w-3.5 h-3.5 animate-spin" />{item.burberryProgress ? `${item.burberryProgress.current + 1}/${item.burberryProgress.total}` : 'Creating'}</>) : (<><Sparkles className="w-3.5 h-3.5" />Generate {hasSelection ? `(${selectedThemes.length})` : ''}</>)}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="px-5 py-4 border-b border-gray-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Select British Locations (multiple)</label>
+                        <div className="flex gap-2 text-[10px]">
+                          <button onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedBurberryThemes: BURBERRY_THEMES.map(p => p.id) } : i))} className="text-gray-400 hover:text-gray-600">Select all</button>
+                          <span className="text-gray-200">·</span>
+                          <button onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedBurberryThemes: [] } : i))} className="text-gray-400 hover:text-gray-600">Clear</button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                        {BURBERRY_THEMES.map(theme => {
+                          const isSelected = selectedThemes.includes(theme.id);
+                          return (
+                            <button key={theme.id} onClick={() => toggleBurberryTheme(item.id, theme.id)} disabled={isItemGenerating} className={`p-2 rounded-lg transition-all duration-200 border disabled:opacity-50 text-left ${isSelected ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-stone-500'}`}>
+                              <div className="w-full aspect-square rounded-md mb-1.5 border" style={{ backgroundColor: theme.paletteHex, borderColor: isSelected ? 'rgba(255,255,255,0.2)' : '#e5e7eb' }} />
+                              <p className="text-[10px] font-semibold truncate">{theme.label}</p>
+                              <p className={`text-[8px] truncate ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>{theme.mood}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="p-5">
+                      {images.length === 0 && !isItemGenerating ? (
+                        <div className="py-10 flex flex-col items-center justify-center gap-2 text-center">
+                          <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center"><Camera className="w-5 h-5 text-gray-300" /></div>
+                          <p className="text-xs text-gray-400">Select one or more British landscapes, then hit Generate</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {(() => {
+                            const selectedDefs = BURBERRY_THEMES.filter(p => selectedThemes.includes(p.id));
+                            const total = isItemGenerating && item.burberryProgress ? item.burberryProgress.total : selectedDefs.length;
+                            const currentIdx = item.burberryProgress?.current ?? -1;
+                            return selectedDefs.slice(0, Math.max(total, images.length)).map((theme, idx) => {
+                              const generated = images.find(c => c.themeId === theme.id);
+                              const isCurrent = isItemGenerating && idx === currentIdx;
+                              const isWaiting = isItemGenerating && idx > currentIdx && !generated;
+                              return (
+                                <div key={theme.id} className="group">
+                                  <div className={`aspect-square rounded-xl overflow-hidden relative border transition-all ${generated ? 'border-gray-200 hover:border-gray-300' : 'border-gray-100 bg-gray-50/50'} ${isCurrent ? 'ring-1 ring-stone-500' : ''}`}>
+                                    {generated ? (
+                                      <>
+                                        <img src={generated.view.url} alt={theme.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
+                                          <button onClick={() => downloadImage(generated.view.url, `VPPA_Heritage_UK_${theme.id}_${item.id}.png`)} className="w-full py-1.5 rounded-lg bg-white text-gray-700 text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 shadow-sm"><Download className="w-3 h-3" />Save</button>
+                                        </div>
+                                      </>
+                                    ) : isCurrent ? (
+                                      <div className="w-full h-full flex flex-col items-center justify-center gap-1.5"><Loader2 className="w-5 h-5 animate-spin text-stone-700" /><div className="w-8 h-0.5 rounded-full bg-stone-200 overflow-hidden"><div className="h-full bg-stone-600 rounded-full shimmer" style={{ width: '60%' }} /></div></div>
+                                    ) : isWaiting ? (
+                                      <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-gray-200 animate-pulse" /></div>
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center"><div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center"><ImageIcon className="w-3 h-3 text-gray-300" /></div></div>
+                                    )}
+                                  </div>
+                                  <p className={`text-[10px] mt-1.5 text-center font-medium truncate ${generated ? 'text-gray-500' : isCurrent ? 'text-stone-700' : 'text-gray-300'}`}>{theme.label}</p>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            )}
+
+            {campaignTab === 'balenciaga' && (
+            <div className="space-y-6">
+              {apparelItems.map((item) => {
+                const selectedThemes = item.selectedBalenciagaThemes || [];
+                const hasSelection = selectedThemes.length > 0;
+                const isItemGenerating = item.balenciagaStatus === 'generating';
+                const images = item.balenciagaImages || [];
+                return (
+                  <div key={`balenciaga-${item.id}`} className="glass rounded-2xl overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+                      <img src={item.images[0].preview} alt="ref" className="w-11 h-11 rounded-lg object-cover border border-gray-200" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-700 truncate">Dystopian</span>
+                          {item.uploadMode === 'printed' && (<span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 font-medium">Printed</span>)}
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">{selectedThemes.length} selected</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">{item.images.length} reference{item.images.length > 1 ? 's' : ''} · Balenciaga / Demna brutalist · logo only</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-gray-200 focus-within:border-zinc-700 focus-within:ring-2 focus-within:ring-zinc-200 transition-all">
+                          <span className="text-xs font-semibold text-gray-400">₹</span>
+                          <input type="text" inputMode="decimal" value={item.price || ''} onChange={(e) => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, price: e.target.value.replace(/[^\d.,]/g, '') } : i))} placeholder="Price" className="w-20 text-xs text-gray-700 placeholder:text-gray-300 bg-transparent focus:outline-none" />
+                        </div>
+                        <button onClick={() => generateBalenciagaImages(item.id)} disabled={!hasSelection || isItemGenerating || isGenerating || isGeneratingBalenciaga} className="px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-zinc-700 to-zinc-900 hover:from-zinc-800 hover:to-black text-white shadow-sm">
+                          {isItemGenerating ? (<><Loader2 className="w-3.5 h-3.5 animate-spin" />{item.balenciagaProgress ? `${item.balenciagaProgress.current + 1}/${item.balenciagaProgress.total}` : 'Creating'}</>) : (<><Sparkles className="w-3.5 h-3.5" />Generate {hasSelection ? `(${selectedThemes.length})` : ''}</>)}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="px-5 py-4 border-b border-gray-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Select Dystopian Environments (multiple)</label>
+                        <div className="flex gap-2 text-[10px]">
+                          <button onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedBalenciagaThemes: BALENCIAGA_THEMES.map(p => p.id) } : i))} className="text-gray-400 hover:text-gray-600">Select all</button>
+                          <span className="text-gray-200">·</span>
+                          <button onClick={() => setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, selectedBalenciagaThemes: [] } : i))} className="text-gray-400 hover:text-gray-600">Clear</button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                        {BALENCIAGA_THEMES.map(theme => {
+                          const isSelected = selectedThemes.includes(theme.id);
+                          return (
+                            <button key={theme.id} onClick={() => toggleBalenciagaTheme(item.id, theme.id)} disabled={isItemGenerating} className={`p-2 rounded-lg transition-all duration-200 border disabled:opacity-50 text-left ${isSelected ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-zinc-700'}`}>
+                              <div className="w-full aspect-square rounded-md mb-1.5 border" style={{ backgroundColor: theme.paletteHex, borderColor: isSelected ? 'rgba(255,255,255,0.2)' : '#e5e7eb' }} />
+                              <p className="text-[10px] font-semibold truncate">{theme.label}</p>
+                              <p className={`text-[8px] truncate ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>{theme.mood}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="p-5">
+                      {images.length === 0 && !isItemGenerating ? (
+                        <div className="py-10 flex flex-col items-center justify-center gap-2 text-center">
+                          <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center"><Zap className="w-5 h-5 text-gray-300" /></div>
+                          <p className="text-xs text-gray-400">Select one or more dystopian environments, then hit Generate</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {(() => {
+                            const selectedDefs = BALENCIAGA_THEMES.filter(p => selectedThemes.includes(p.id));
+                            const total = isItemGenerating && item.balenciagaProgress ? item.balenciagaProgress.total : selectedDefs.length;
+                            const currentIdx = item.balenciagaProgress?.current ?? -1;
+                            return selectedDefs.slice(0, Math.max(total, images.length)).map((theme, idx) => {
+                              const generated = images.find(c => c.themeId === theme.id);
+                              const isCurrent = isItemGenerating && idx === currentIdx;
+                              const isWaiting = isItemGenerating && idx > currentIdx && !generated;
+                              return (
+                                <div key={theme.id} className="group">
+                                  <div className={`aspect-square rounded-xl overflow-hidden relative border transition-all ${generated ? 'border-gray-200 hover:border-gray-300' : 'border-gray-100 bg-gray-50/50'} ${isCurrent ? 'ring-1 ring-zinc-700' : ''}`}>
+                                    {generated ? (
+                                      <>
+                                        <img src={generated.view.url} alt={theme.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
+                                          <button onClick={() => downloadImage(generated.view.url, `VPPA_Dystopia_${theme.id}_${item.id}.png`)} className="w-full py-1.5 rounded-lg bg-white text-gray-700 text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 shadow-sm"><Download className="w-3 h-3" />Save</button>
+                                        </div>
+                                      </>
+                                    ) : isCurrent ? (
+                                      <div className="w-full h-full flex flex-col items-center justify-center gap-1.5"><Loader2 className="w-5 h-5 animate-spin text-zinc-800" /><div className="w-8 h-0.5 rounded-full bg-zinc-200 overflow-hidden"><div className="h-full bg-zinc-800 rounded-full shimmer" style={{ width: '60%' }} /></div></div>
+                                    ) : isWaiting ? (
+                                      <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-gray-200 animate-pulse" /></div>
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center"><div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center"><ImageIcon className="w-3 h-3 text-gray-300" /></div></div>
+                                    )}
+                                  </div>
+                                  <p className={`text-[10px] mt-1.5 text-center font-medium truncate ${generated ? 'text-gray-500' : isCurrent ? 'text-zinc-800' : 'text-gray-300'}`}>{theme.label}</p>
                                 </div>
                               );
                             });
