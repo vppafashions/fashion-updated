@@ -11,29 +11,59 @@ import { motion, AnimatePresence } from 'motion/react';
 // Initialize Gemini API
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
-// Image generation model.
-// NOTE: gemini-3.1-flash-image-preview (Nano Banana 2) requires a paid billing tier.
-// Free-tier accounts get 429 RESOURCE_EXHAUSTED with limit:0 on that model.
-// gemini-2.5-flash-image works on the free tier.
-const IMAGE_MODEL = 'gemini-2.5-flash-image';
+// Image generation model (with automatic fallback).
+// Primary = latest Nano Banana 2 (paid tier, sharper 4K).
+// Fallback = gemini-2.5-flash-image (works on free tier too) used when the primary
+// returns 429 / RESOURCE_EXHAUSTED / limit:0 errors.
+const IMAGE_MODEL_PRIMARY = 'gemini-3.1-flash-image-preview';
+const IMAGE_MODEL_FALLBACK = 'gemini-2.5-flash-image';
+const IMAGE_MODEL = IMAGE_MODEL_PRIMARY; // kept for any external reference
 const ANALYSIS_MODEL = 'gemini-3-flash-preview';
 
-// Helper: call generateContent with automatic retry on 429 (rate limit) errors.
-async function callImageGenWithRetry(params: any, maxRetries = 3): Promise<any> {
+// Runtime flag: once the primary hits a hard-quota 429 (limit:0) we stop trying it
+// for the rest of the session and go straight to the fallback to save latency.
+let imageModelDegraded = false;
+// Optional hook: set by the app so the helper can surface a one-time info toast.
+let onImageModelFallback: ((msg: string) => void) | null = null;
+
+// Helper: call generateContent with automatic retry on 429 errors.
+// Strategy: try primary -> if 429, retry with backoff (respecting server retryDelay)
+// -> if still 429 or immediate limit:0, swap to fallback model and try again.
+async function callImageGenWithRetry(params: any, maxRetries = 2): Promise<any> {
+  const originalModel = params?.model || IMAGE_MODEL_PRIMARY;
+  const primaryModel = imageModelDegraded ? IMAGE_MODEL_FALLBACK : originalModel;
   let lastErr: any = null;
+
+  // Phase 1: primary attempts with backoff
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await genAI.models.generateContent(params);
+      return await genAI.models.generateContent({ ...params, model: primaryModel });
     } catch (err: any) {
       lastErr = err;
       const msg = typeof err?.message === 'string' ? err.message : JSON.stringify(err || {});
       const is429 = msg.includes('RESOURCE_EXHAUSTED') || msg.includes('"code":429') || msg.includes(' 429');
-      const isLimitZero = msg.includes('limit: 0') || msg.includes('limit":0');
-      if (!is429 || isLimitZero || attempt === maxRetries) throw err;
+      const isHardQuota = msg.includes('limit: 0') || msg.includes('limit":0');
+      if (!is429) throw err;
+      if (isHardQuota || attempt === maxRetries) break; // jump to fallback
       const retryMatch = msg.match(/retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/);
       const delaySec = retryMatch ? parseFloat(retryMatch[1]) : Math.pow(2, attempt);
-      const delayMs = Math.min(60000, Math.max(1000, delaySec * 1000));
+      const delayMs = Math.min(30000, Math.max(1000, delaySec * 1000));
       await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+
+  // Phase 2: fall back to secondary model (only if primary was NOT already the fallback)
+  if (primaryModel !== IMAGE_MODEL_FALLBACK) {
+    const wasFirstDegradation = !imageModelDegraded;
+    imageModelDegraded = true; // remember for rest of session
+    console.warn(`[image] primary model ${primaryModel} exhausted, falling back to ${IMAGE_MODEL_FALLBACK}`);
+    if (wasFirstDegradation && onImageModelFallback) {
+      onImageModelFallback(`Nano Banana 2 quota hit. Falling back to ${IMAGE_MODEL_FALLBACK} for the rest of this session.`);
+    }
+    try {
+      return await genAI.models.generateContent({ ...params, model: IMAGE_MODEL_FALLBACK });
+    } catch (fallbackErr: any) {
+      throw fallbackErr;
     }
   }
   throw lastErr;
@@ -548,6 +578,9 @@ function StudioApp() {
     setTimeout(() => setToast(prev => prev?.message === message ? null : prev), 7000);
   };
 
+  // Wire the module-level fallback hook to this component's toast.
+  onImageModelFallback = (msg: string) => showToast('info', msg);
+
   const describeError = (err: any): string => {
     const msg = typeof err?.message === 'string' ? err.message : '';
     if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('"code":429')) {
@@ -962,13 +995,13 @@ Also provide a one-sentence product description.`,
           });
 
           try {
-            const response = await callWithRetry(() => genAI.models.generateContent({
+            const response = await callImageGenWithRetry({
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
                 imageConfig: { aspectRatio: "1:1", imageSize: "1K" }
               }
-            }));
+            });
 
             let url = '';
             let desc = '';
@@ -991,6 +1024,7 @@ Also provide a one-sentence product description.`,
             
           } catch (viewError) {
             console.error(`Failed to generate view ${v}:`, viewError);
+            showToast('error', `View ${v + 1}: ${describeError(viewError)}`);
           }
         }
 
