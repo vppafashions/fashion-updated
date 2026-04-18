@@ -517,6 +517,113 @@ const MAX_PHOTOS_PER_ITEM = 5;
 
 type Gender = 'women' | 'men';
 
+type Ethnicity =
+  | 'indian'
+  | 'indo-american'
+  | 'indo-spanish'
+  | 'indo-european'
+  | 'indo-east-asian'
+  | 'indo-african'
+  | 'indo-persian'
+  | 'indo-brazilian';
+
+interface EthnicityProfile {
+  id: Ethnicity;
+  label: string;
+  shortLabel: string;
+  description: string;
+  womanDescriptor: string;
+  manDescriptor: string;
+  skinTone: string;
+}
+
+const ETHNICITY_PROFILES: EthnicityProfile[] = [
+  {
+    id: 'indian',
+    label: 'Indian',
+    shortLabel: 'Indian',
+    description: 'Classic South Asian features, medium-brown skin',
+    womanDescriptor: 'Indian woman of South Asian heritage with elegant South Asian features',
+    manDescriptor: 'Indian man of South Asian heritage with sharp South Asian features',
+    skinTone: 'medium-brown skin'
+  },
+  {
+    id: 'indo-american',
+    label: 'Indo-American',
+    shortLabel: 'Indo-American',
+    description: 'Indian + American mixed heritage, warm honey skin',
+    womanDescriptor: 'Indian-American mixed-heritage woman with features blending South Asian and Caucasian-American (soft refined cheekbones, expressive eyes)',
+    manDescriptor: 'Indian-American mixed-heritage man with features blending South Asian and Caucasian-American (strong jawline, refined bone structure)',
+    skinTone: 'warm honey-tan skin with a gentle golden undertone'
+  },
+  {
+    id: 'indo-spanish',
+    label: 'Indo-Spanish',
+    shortLabel: 'Indo-Latina',
+    description: 'Indian + Spanish/Latin mixed heritage, warm olive-caramel skin',
+    womanDescriptor: 'Indo-Latina mixed-heritage woman with features blending South Asian and Spanish/Latina (warm expressive eyes, sculpted cheekbones, softly arched brow)',
+    manDescriptor: 'Indo-Latino mixed-heritage man with features blending South Asian and Spanish/Latin (warm dark eyes, strong brow, defined cheekbone)',
+    skinTone: 'warm olive-caramel skin with subtle sun-kissed warmth'
+  },
+  {
+    id: 'indo-european',
+    label: 'Indo-European',
+    shortLabel: 'Indo-European',
+    description: 'Indian + European mixed heritage, light warm-tan skin',
+    womanDescriptor: 'Indo-European mixed-heritage woman with features blending South Asian and European (refined bone structure, soft facial angles, subtle warm tone)',
+    manDescriptor: 'Indo-European mixed-heritage man with features blending South Asian and European (refined jaw, softened South Asian features)',
+    skinTone: 'light warm-tan skin with a subtle rosy undertone'
+  },
+  {
+    id: 'indo-east-asian',
+    label: 'Indo-East Asian',
+    shortLabel: 'Indo-East Asian',
+    description: 'Indian + East Asian mixed heritage, porcelain-tan skin',
+    womanDescriptor: 'Indo-East Asian mixed-heritage woman with features blending South Asian and East Asian (softly almond-shaped eyes, high delicate cheekbones)',
+    manDescriptor: 'Indo-East Asian mixed-heritage man with features blending South Asian and East Asian (sharp cheekbones, almond-shaped eyes, refined nose)',
+    skinTone: 'warm porcelain-tan skin with a subtle peach undertone'
+  },
+  {
+    id: 'indo-african',
+    label: 'Indo-African',
+    shortLabel: 'Indo-African',
+    description: 'Indian + African mixed heritage, rich warm-brown skin',
+    womanDescriptor: 'Indo-African mixed-heritage woman with features blending South Asian and African (full lips, expressive eyes, rich natural bone structure)',
+    manDescriptor: 'Indo-African mixed-heritage man with features blending South Asian and African (strong jawline, expressive eyes, refined natural bone structure)',
+    skinTone: 'rich warm-brown skin with a deep glow'
+  },
+  {
+    id: 'indo-persian',
+    label: 'Indo-Persian',
+    shortLabel: 'Indo-Persian',
+    description: 'Indian + Middle Eastern mixed heritage, tan-olive skin',
+    womanDescriptor: 'Indo-Persian mixed-heritage woman with features blending South Asian and Middle Eastern (deep-set expressive eyes, strong arched brow, defined nose)',
+    manDescriptor: 'Indo-Persian mixed-heritage man with features blending South Asian and Middle Eastern (deep-set eyes, strong brow, refined aristocratic nose)',
+    skinTone: 'warm tan-olive skin with a golden undertone'
+  },
+  {
+    id: 'indo-brazilian',
+    label: 'Indo-Brazilian',
+    shortLabel: 'Indo-Brazilian',
+    description: 'Indian + Brazilian mixed heritage, sun-kissed bronze skin',
+    womanDescriptor: 'Indo-Brazilian mixed-heritage woman with features blending South Asian and Brazilian (glowing sun-kissed skin, soft voluminous waves, expressive warm eyes)',
+    manDescriptor: 'Indo-Brazilian mixed-heritage man with features blending South Asian and Brazilian (strong natural build, sun-warmed skin, tousled waves)',
+    skinTone: 'sun-kissed warm bronze skin with a glowing undertone'
+  },
+];
+
+// Helper: rewrites hardcoded "Indian woman/man" + "medium-brown skin" in a prompt
+// snippet to match the selected ethnicity profile. Called from every generator.
+function applyEthnicity(description: string, ethnicity: Ethnicity, gender: Gender): string {
+  const profile = ETHNICITY_PROFILES.find(p => p.id === ethnicity) || ETHNICITY_PROFILES[0];
+  if (profile.id === 'indian') return description;
+  const descriptor = gender === 'women' ? profile.womanDescriptor : profile.manDescriptor;
+  return description
+    .replace(/Indian woman/g, descriptor)
+    .replace(/Indian man/g, descriptor)
+    .replace(/medium-brown skin/g, profile.skinTone);
+}
+
 const MODEL_PROMPTS: Record<Gender, { label: string; views: [string, string] }> = {
   women: {
     label: 'Women',
@@ -554,8 +661,8 @@ const getViewTypes = (gender: Gender) => [
   ...PRODUCT_VIEW_TYPES
 ];
 
-const getViewPrompts = (gender: Gender) => [
-  ...MODEL_PROMPTS[gender].views,
+const getViewPrompts = (gender: Gender, ethnicity: Ethnicity = 'indian') => [
+  ...MODEL_PROMPTS[gender].views.map(v => applyEthnicity(v, ethnicity, gender)),
   ...PRODUCT_VIEW_PROMPTS
 ];
 
@@ -682,6 +789,7 @@ function StudioApp() {
   const [apparelItems, setApparelItems] = useState<ApparelItem[]>([]);
   const [selectedStyle, setSelectedStyle] = useState(BACKGROUND_STYLES[0]);
   const [selectedGender, setSelectedGender] = useState<Gender>('women');
+  const [selectedEthnicity, setSelectedEthnicity] = useState<Ethnicity>('indian');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingCampaigns, setIsGeneratingCampaigns] = useState(false);
   const [isGeneratingPress, setIsGeneratingPress] = useState(false);
@@ -1019,7 +1127,7 @@ Be EXTREMELY precise about the prints/graphics. Every detail matters -- the imag
 
       for (let i = 0; i < apparelItems.length; i++) {
         const item = apparelItems[i];
-        const currentSettingsKey = `${selectedStyle.id}_${selectedGender}`;
+        const currentSettingsKey = `${selectedStyle.id}_${selectedGender}_${selectedEthnicity}`;
         const settingsChanged = item.generatedStyleId && item.generatedStyleId !== currentSettingsKey;
         if (item.status === 'completed' && !settingsChanged) continue;
 
@@ -1028,7 +1136,7 @@ Be EXTREMELY precise about the prints/graphics. Every detail matters -- the imag
         }
 
         const viewTypes = getViewTypes(selectedGender);
-        const viewPrompts = getViewPrompts(selectedGender);
+        const viewPrompts = getViewPrompts(selectedGender, selectedEthnicity);
 
         const imageDataParts: { data: string; mimeType: string }[] = [];
         for (const img of item.images) {
@@ -1321,8 +1429,8 @@ Also provide a one-sentence product description.`,
         }
 
         const modelDescription = selectedGender === 'women'
-          ? "a single young Indian woman, age 20-26, elegant features, medium-brown skin, styled dark hair, confident expression"
-          : "a single young Indian man, age 20-26, sharp features, medium-brown skin, well-groomed hair, confident expression";
+          ? applyEthnicity("a single young Indian woman, age 20-26, elegant features, medium-brown skin, styled dark hair, confident expression", selectedEthnicity, 'women')
+          : applyEthnicity("a single young Indian man, age 20-26, sharp features, medium-brown skin, well-groomed hair, confident expression", selectedEthnicity, 'men');
 
         const generatedCampaigns: { objectId: string; objectLabel: string; view: GeneratedView }[] = [];
 
@@ -1621,8 +1729,8 @@ Reproduce the EXACT apparel from the provided reference images with full materia
         }
 
         const modelDescription = selectedGender === 'women'
-          ? "a single young Indian woman, age 20-26, elegant features, medium-brown skin, styled dark hair, natural beauty, understated confidence"
-          : "a single young Indian man, age 20-26, sharp features, medium-brown skin, well-groomed hair, quiet confidence";
+          ? applyEthnicity("a single young Indian woman, age 20-26, elegant features, medium-brown skin, styled dark hair, natural beauty, understated confidence", selectedEthnicity, 'women')
+          : applyEthnicity("a single young Indian man, age 20-26, sharp features, medium-brown skin, well-groomed hair, quiet confidence", selectedEthnicity, 'men');
 
         const generatedEditorial: { settingId: string; settingLabel: string; view: GeneratedView }[] = [];
 
@@ -1746,8 +1854,8 @@ MOOD REFERENCE: Zara SS/AW Studio campaigns, Massimo Dutti lookbook, Arket ensem
         }
 
         const modelDescription = selectedGender === 'women'
-          ? "a single young Indian woman, age 22-28, refined features, medium-brown skin, elegantly styled dark hair, sophisticated editorial expression"
-          : "a single young Indian man, age 22-28, aristocratic features, medium-brown skin, perfectly groomed hair, sophisticated editorial expression";
+          ? applyEthnicity("a single young Indian woman, age 22-28, refined features, medium-brown skin, elegantly styled dark hair, sophisticated editorial expression", selectedEthnicity, 'women')
+          : applyEthnicity("a single young Indian man, age 22-28, aristocratic features, medium-brown skin, perfectly groomed hair, sophisticated editorial expression", selectedEthnicity, 'men');
 
         const generatedHeritage: { paletteId: string; paletteLabel: string; view: GeneratedView }[] = [];
 
@@ -2017,8 +2125,8 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         }
 
         const modelDescription = selectedGender === 'women'
-          ? "a single young Indian woman, age 22-28, refined natural features, medium-brown skin, undone tousled hair, no visible makeup, gaze quiet and unposed"
-          : "a single young Indian man, age 22-28, natural features, medium-brown skin, slightly tousled hair, gaze quiet and unposed";
+          ? applyEthnicity("a single young Indian woman, age 22-28, refined natural features, medium-brown skin, undone tousled hair, no visible makeup, gaze quiet and unposed", selectedEthnicity, 'women')
+          : applyEthnicity("a single young Indian man, age 22-28, natural features, medium-brown skin, slightly tousled hair, gaze quiet and unposed", selectedEthnicity, 'men');
 
         const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
 
@@ -2149,8 +2257,8 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         }
 
         const modelDescription = selectedGender === 'women'
-          ? "a single young Indian woman, age 22-28, sharp angular features, medium-brown skin, slick dark hair, smoky-eye attitude, defiant editorial gaze"
-          : "a single young Indian man, age 22-28, sharp angular features, medium-brown skin, slick dark hair, brooding rock-noir attitude";
+          ? applyEthnicity("a single young Indian woman, age 22-28, sharp angular features, medium-brown skin, slick dark hair, smoky-eye attitude, defiant editorial gaze", selectedEthnicity, 'women')
+          : applyEthnicity("a single young Indian man, age 22-28, sharp angular features, medium-brown skin, slick dark hair, brooding rock-noir attitude", selectedEthnicity, 'men');
 
         const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
 
@@ -2267,8 +2375,8 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
           imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
         }
         const modelDescription = selectedGender === 'women'
-          ? "a single young Indian woman, age 22-28, sharp intellectual features, medium-brown skin, severe minimalist hair, no smile, deadpan editorial gaze"
-          : "a single young Indian man, age 22-28, sharp intellectual features, medium-brown skin, severe combed hair, deadpan editorial gaze";
+          ? applyEthnicity("a single young Indian woman, age 22-28, sharp intellectual features, medium-brown skin, severe minimalist hair, no smile, deadpan editorial gaze", selectedEthnicity, 'women')
+          : applyEthnicity("a single young Indian man, age 22-28, sharp intellectual features, medium-brown skin, severe combed hair, deadpan editorial gaze", selectedEthnicity, 'men');
         const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
         for (let pi = 0; pi < themesToGenerate.length; pi++) {
           const theme = themesToGenerate[pi];
@@ -2343,8 +2451,8 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
           imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
         }
         const modelDescription = selectedGender === 'women'
-          ? "a single young Indian woman, age 22-28, refined romantic features, medium-brown skin, softly styled dark hair, painterly haute couture beauty, subtle warm makeup"
-          : "a single young Indian man, age 22-28, classical aristocratic features, medium-brown skin, softly styled dark hair, painterly couture refinement";
+          ? applyEthnicity("a single young Indian woman, age 22-28, refined romantic features, medium-brown skin, softly styled dark hair, painterly haute couture beauty, subtle warm makeup", selectedEthnicity, 'women')
+          : applyEthnicity("a single young Indian man, age 22-28, classical aristocratic features, medium-brown skin, softly styled dark hair, painterly couture refinement", selectedEthnicity, 'men');
         const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
         for (let pi = 0; pi < themesToGenerate.length; pi++) {
           const theme = themesToGenerate[pi];
@@ -2421,8 +2529,8 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
           imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
         }
         const modelDescription = selectedGender === 'women'
-          ? "a single young Indian woman, age 22-28, sun-kissed glowing features, medium-brown skin tanned warm, natural undone hair, fresh natural look"
-          : "a single young Indian man, age 22-28, sun-kissed features, medium-brown skin tanned warm, tousled natural hair, easy mediterranean charm";
+          ? applyEthnicity("a single young Indian woman, age 22-28, sun-kissed glowing features, medium-brown skin tanned warm, natural undone hair, fresh natural look", selectedEthnicity, 'women')
+          : applyEthnicity("a single young Indian man, age 22-28, sun-kissed features, medium-brown skin tanned warm, tousled natural hair, easy mediterranean charm", selectedEthnicity, 'men');
         const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
         for (let pi = 0; pi < themesToGenerate.length; pi++) {
           const theme = themesToGenerate[pi];
@@ -2500,8 +2608,8 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
           imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
         }
         const modelDescription = selectedGender === 'women'
-          ? "a single young Indian woman, age 22-28, refined natural features, medium-brown skin, wind-tousled dark hair, no smile, stoic British editorial gaze"
-          : "a single young Indian man, age 22-28, refined natural features, medium-brown skin, wind-tousled dark hair, stoic British editorial gaze";
+          ? applyEthnicity("a single young Indian woman, age 22-28, refined natural features, medium-brown skin, wind-tousled dark hair, no smile, stoic British editorial gaze", selectedEthnicity, 'women')
+          : applyEthnicity("a single young Indian man, age 22-28, refined natural features, medium-brown skin, wind-tousled dark hair, stoic British editorial gaze", selectedEthnicity, 'men');
         const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
         for (let pi = 0; pi < themesToGenerate.length; pi++) {
           const theme = themesToGenerate[pi];
@@ -2577,8 +2685,8 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
           imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
         }
         const modelDescription = selectedGender === 'women'
-          ? "a single young Indian woman, age 22-28, severe angular features, medium-brown skin, slick straight dark hair pulled back, dead-calm dystopian gaze"
-          : "a single young Indian man, age 22-28, severe angular features, medium-brown skin, slick straight dark hair, dead-calm dystopian gaze";
+          ? applyEthnicity("a single young Indian woman, age 22-28, severe angular features, medium-brown skin, slick straight dark hair pulled back, dead-calm dystopian gaze", selectedEthnicity, 'women')
+          : applyEthnicity("a single young Indian man, age 22-28, severe angular features, medium-brown skin, slick straight dark hair, dead-calm dystopian gaze", selectedEthnicity, 'men');
         const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
         for (let pi = 0; pi < themesToGenerate.length; pi++) {
           const theme = themesToGenerate[pi];
@@ -2807,6 +2915,33 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Ethnicity Selector */}
+            <div>
+              <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-3 block">
+                Ethnicity
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedEthnicity}
+                  onChange={(e) => setSelectedEthnicity(e.target.value as Ethnicity)}
+                  className="appearance-none pl-4 pr-9 py-2.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700 hover:border-gray-300 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 cursor-pointer transition-all min-w-[160px]"
+                  title={ETHNICITY_PROFILES.find(p => p.id === selectedEthnicity)?.description}
+                >
+                  {ETHNICITY_PROFILES.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+                <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+              <p className="text-[9px] text-gray-400 mt-1.5 max-w-[200px] leading-relaxed">
+                {ETHNICITY_PROFILES.find(p => p.id === selectedEthnicity)?.description}
+              </p>
             </div>
 
             {/* Generate */}
