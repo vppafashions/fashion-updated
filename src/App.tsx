@@ -3,67 +3,197 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI } from "@google/genai";
-import { Upload, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, Sparkles, Trash2, Plus, X, Download, Camera, Layers, Zap, RotateCcw, Lock, Mail, Eye, EyeOff } from 'lucide-react';
+import { Upload, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, Sparkles, Trash2, Plus, X, Download, Camera, Layers, Zap, RotateCcw, RefreshCw, Lock, Mail, Eye, EyeOff, ChevronLeft, ChevronRight, Share2, Heart, ArrowLeft, Archive } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import JSZip from 'jszip';
 
-// Initialize Gemini API
+const SHOW_BRAND_CAMPAIGNS = false;
+
+// Initialize Gemini API (used ONLY for image-to-text analysis, not image generation).
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
-// Image generation model (with automatic fallback).
-// Primary = latest Nano Banana 2 (paid tier, sharper 4K).
-// Fallback = gemini-2.5-flash-image (works on free tier too) used when the primary
-// returns 429 / RESOURCE_EXHAUSTED / limit:0 errors.
-const IMAGE_MODEL_PRIMARY = 'gemini-3.1-flash-image-preview';
-const IMAGE_MODEL_FALLBACK = 'gemini-2.5-flash-image';
-const IMAGE_MODEL = IMAGE_MODEL_PRIMARY; // kept for any external reference
+// Image generation goes through Runware (Google direct image-gen is blocked for this account).
+// Runware exposes Nano Banana 2 (Gemini 3.1 Flash Image) under the model id "google:4@3".
+const RUNWARE_API_KEY = process.env.RUNWARE_API_KEY || "";
+const RUNWARE_ENDPOINT = "https://api.runware.ai/v1";
+const RUNWARE_IMAGE_MODEL = "google:4@3";
+
+// Kept for backwards compatibility with code that references these constants.
+const IMAGE_MODEL_PRIMARY = RUNWARE_IMAGE_MODEL;
+const IMAGE_MODEL_FALLBACK = RUNWARE_IMAGE_MODEL;
+const IMAGE_MODEL = RUNWARE_IMAGE_MODEL;
 const ANALYSIS_MODEL = 'gemini-3-flash-preview';
 
-// Runtime flag: once the primary hits a hard-quota 429 (limit:0) we stop trying it
-// for the rest of the session and go straight to the fallback to save latency.
-let imageModelDegraded = false;
 // Optional hook: set by the app so the helper can surface a one-time info toast.
 let onImageModelFallback: ((msg: string) => void) | null = null;
 
-// Helper: call generateContent with automatic retry on 429 errors.
-// Strategy: try primary -> if 429, retry with backoff (respecting server retryDelay)
-// -> if still 429 or immediate limit:0, swap to fallback model and try again.
-async function callImageGenWithRetry(params: any, maxRetries = 2): Promise<any> {
-  const originalModel = params?.model || IMAGE_MODEL_PRIMARY;
-  const primaryModel = imageModelDegraded ? IMAGE_MODEL_FALLBACK : originalModel;
-  let lastErr: any = null;
+const MAX_PARALLEL_IMAGE_GEN = 4;
 
-  // Phase 1: primary attempts with backoff
+async function runWithConcurrency(
+  count: number,
+  limit: number,
+  worker: (index: number) => Promise<void>
+): Promise<void> {
+  if (count <= 0) return;
+  let cursor = 0;
+  const workerCount = Math.min(Math.max(1, limit), count);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const i = cursor++;
+        if (i >= count) break;
+        try {
+          await worker(i);
+        } catch {
+          // each worker handles its own errors; swallow here so peers keep going.
+        }
+      }
+    })
+  );
+}
+
+// Map Gemini-style imageConfig (aspectRatio + imageSize) to Runware width/height.
+// Runware requires width/height between 256 and 4096 in multiples of 16.
+function resolveRunwareDimensions(aspectRatio?: string, imageSize?: string): { width: number; height: number } {
+  const sizeMap: Record<string, number> = { '0.5K': 512, '1K': 1024, '2K': 2048, '4K': 4096 };
+  const base = sizeMap[imageSize || '1K'] ?? 1024;
+  const parts = (aspectRatio || '1:1').split(':').map(s => parseInt(s, 10));
+  const aw = Number.isFinite(parts[0]) && parts[0] > 0 ? parts[0] : 1;
+  const ah = Number.isFinite(parts[1]) && parts[1] > 0 ? parts[1] : 1;
+  let w: number;
+  let h: number;
+  if (aw >= ah) {
+    w = base;
+    h = Math.round((base * ah) / aw);
+  } else {
+    h = base;
+    w = Math.round((base * aw) / ah);
+  }
+  const snap = (n: number) => Math.max(256, Math.min(4096, Math.round(n / 16) * 16));
+  return { width: snap(w), height: snap(h) };
+}
+
+function makeUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try { return crypto.randomUUID(); } catch { /* fall through */ }
+  }
+  // RFC4122 v4 fallback.
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) crypto.getRandomValues(bytes);
+  else for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+// Helper: call Runware imageInference with automatic retry on transient errors.
+// Accepts the legacy Gemini-shaped params ({ contents: { parts: [{inlineData}, ..., {text}] }, config: { imageConfig } })
+// and returns a Gemini-shaped response so existing call sites continue to work without modification.
+async function callImageGenWithRetry(params: any, maxRetries = 2): Promise<any> {
+  if (!RUNWARE_API_KEY) {
+    throw new Error('Missing RUNWARE_API_KEY. Add it to .env and rebuild.');
+  }
+
+  const allParts: any[] = Array.isArray(params?.contents?.parts) ? params.contents.parts : [];
+  const referenceImages: string[] = [];
+  const textChunks: string[] = [];
+  for (const p of allParts) {
+    if (p?.inlineData?.data) {
+      const mime = p.inlineData.mimeType || 'image/png';
+      referenceImages.push(`data:${mime};base64,${p.inlineData.data}`);
+    } else if (typeof p?.text === 'string' && p.text.trim()) {
+      textChunks.push(p.text);
+    }
+  }
+  const positivePrompt = textChunks.join('\n\n').trim() || 'Generate a high quality image.';
+
+  const imageConfig = params?.config?.imageConfig || {};
+  const { width, height } = resolveRunwareDimensions(imageConfig.aspectRatio, imageConfig.imageSize);
+
+  let lastErr: any = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await genAI.models.generateContent({ ...params, model: primaryModel });
+      const task: Record<string, any> = {
+        taskType: 'imageInference',
+        taskUUID: makeUUID(),
+        model: RUNWARE_IMAGE_MODEL,
+        positivePrompt,
+        width,
+        height,
+        numberResults: 1,
+        outputType: 'base64Data',
+        outputFormat: 'PNG',
+        includeCost: false,
+        providerSettings: { google: { safetyTolerance: 'off' } },
+      };
+      if (referenceImages.length > 0) {
+        task.inputs = { referenceImages };
+      }
+
+      const res = await fetch(RUNWARE_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${RUNWARE_API_KEY}`,
+        },
+        body: JSON.stringify([task]),
+      });
+
+      let json: any = null;
+      try { json = await res.json(); } catch { /* keep null */ }
+
+      if (!res.ok) {
+        const apiMsg = json?.errors?.[0]?.message || json?.error || `Runware HTTP ${res.status}`;
+        throw new Error(apiMsg);
+      }
+      if (json?.errors?.length) {
+        throw new Error(json.errors[0].message || 'Runware request failed.');
+      }
+
+      const item = (json?.data || []).find((d: any) => d?.taskType === 'imageInference') || (json?.data || [])[0];
+      if (!item) throw new Error('Runware: empty response from imageInference.');
+
+      let base64 = '';
+      let mimeType = 'image/png';
+      if (typeof item.imageBase64Data === 'string' && item.imageBase64Data.length > 0) {
+        base64 = item.imageBase64Data;
+      } else if (typeof item.imageDataURI === 'string') {
+        const m = item.imageDataURI.match(/^data:([^;]+);base64,(.+)$/);
+        if (m) { mimeType = m[1]; base64 = m[2]; }
+      } else if (typeof item.imageURL === 'string') {
+        const imgRes = await fetch(item.imageURL);
+        if (!imgRes.ok) throw new Error(`Failed to download Runware image (${imgRes.status}).`);
+        const buf = await imgRes.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        base64 = typeof btoa === 'function' ? btoa(binary) : Buffer.from(bytes).toString('base64');
+        const ct = imgRes.headers.get('content-type');
+        if (ct) mimeType = ct.split(';')[0];
+      } else {
+        throw new Error('Runware: response did not include any image payload.');
+      }
+
+      return {
+        candidates: [{
+          content: {
+            parts: [
+              { inlineData: { data: base64, mimeType } },
+            ],
+          },
+        }],
+      };
     } catch (err: any) {
       lastErr = err;
       const msg = typeof err?.message === 'string' ? err.message : JSON.stringify(err || {});
-      const is429 = msg.includes('RESOURCE_EXHAUSTED') || msg.includes('"code":429') || msg.includes(' 429');
-      const isHardQuota = msg.includes('limit: 0') || msg.includes('limit":0');
-      if (!is429) throw err;
-      if (isHardQuota || attempt === maxRetries) break; // jump to fallback
-      const retryMatch = msg.match(/retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/);
-      const delaySec = retryMatch ? parseFloat(retryMatch[1]) : Math.pow(2, attempt);
-      const delayMs = Math.min(30000, Math.max(1000, delaySec * 1000));
+      const isTransient = /\b(429|408|500|502|503|504)\b/.test(msg)
+        || /timeout|rate ?limit|temporarily|busy|try again/i.test(msg);
+      if (!isTransient || attempt === maxRetries) throw err;
+      const delayMs = Math.min(15000, Math.pow(2, attempt) * 1000);
       await new Promise(r => setTimeout(r, delayMs));
-    }
-  }
-
-  // Phase 2: fall back to secondary model (only if primary was NOT already the fallback)
-  if (primaryModel !== IMAGE_MODEL_FALLBACK) {
-    const wasFirstDegradation = !imageModelDegraded;
-    imageModelDegraded = true; // remember for rest of session
-    console.warn(`[image] primary model ${primaryModel} exhausted, falling back to ${IMAGE_MODEL_FALLBACK}`);
-    if (wasFirstDegradation && onImageModelFallback) {
-      onImageModelFallback(`Nano Banana 2 quota hit. Falling back to ${IMAGE_MODEL_FALLBACK} for the rest of this session.`);
-    }
-    try {
-      return await genAI.models.generateContent({ ...params, model: IMAGE_MODEL_FALLBACK });
-    } catch (fallbackErr: any) {
-      throw fallbackErr;
     }
   }
   throw lastErr;
@@ -81,6 +211,12 @@ interface GeneratedView {
   url: string;
   type: string;
   description: string;
+}
+
+interface GalleryImage {
+  url: string;
+  label: string;
+  section: string;
 }
 
 interface ApparelItem {
@@ -628,15 +764,15 @@ const MODEL_PROMPTS: Record<Gender, { label: string; views: [string, string] }> 
   women: {
     label: 'Women',
     views: [
-      "A beautiful Indian woman with elegant features, medium-brown skin, styled dark hair, wearing this exact product. She is standing confidently facing the camera in a high-end fashion editorial pose. Clean, minimal studio background. Professional fashion photography with soft beauty lighting. Full body or three-quarter shot depending on the product. She looks sophisticated and modern.",
-      "The same beautiful Indian woman now photographed from a different angle -- a candid side-profile or walking pose that shows how the product looks in motion. Natural, relaxed posture. Same clean studio background. Soft editorial lighting. The focus is on how the product drapes, fits, and moves on the body."
+      "A beautiful Indian woman with elegant features, medium-brown skin, styled dark hair, wearing this exact product. She is standing confidently facing the camera in a relaxed, contemporary commercial-catalog pose. Full body or three-quarter shot depending on the product. She looks sophisticated and modern. (The background and lighting are specified by the BACKGROUND block below -- follow that exactly. Do NOT invent a moody, dark, or atmospheric backdrop.)",
+      "The same beautiful Indian woman now photographed from a different angle -- a candid side-profile or walking pose that shows how the product looks in motion. Natural, relaxed posture. The focus is on how the product drapes, fits, and moves on the body. (The background and lighting are specified by the BACKGROUND block below -- follow that exactly so this shot matches the front shot's backdrop. Do NOT invent a moody, dark, or atmospheric backdrop.)"
     ]
   },
   men: {
     label: 'Men',
     views: [
-      "A handsome Indian man with sharp features, medium-brown skin, well-groomed hair, wearing this exact product. He is standing confidently facing the camera with a strong editorial pose. Clean, minimal studio background. Professional fashion photography with soft lighting. Full body or three-quarter shot depending on the product. He looks refined and modern.",
-      "The same handsome Indian man now photographed from a different angle -- a candid side-profile or walking pose that shows how the product looks in motion. Natural, confident posture. Same clean studio background. Soft editorial lighting. The focus is on how the product fits and drapes on the body."
+      "A handsome Indian man with sharp features, medium-brown skin, well-groomed hair, wearing this exact product. He is standing confidently facing the camera in a relaxed, contemporary commercial-catalog pose. Full body or three-quarter shot depending on the product. He looks refined and modern. (The background and lighting are specified by the BACKGROUND block below -- follow that exactly. Do NOT invent a moody, dark, or atmospheric backdrop.)",
+      "The same handsome Indian man now photographed from a different angle -- a candid side-profile or walking pose that shows how the product looks in motion. Natural, confident posture. The focus is on how the product fits and drapes on the body. (The background and lighting are specified by the BACKGROUND block below -- follow that exactly so this shot matches the front shot's backdrop. Do NOT invent a moody, dark, or atmospheric backdrop.)"
     ]
   }
 };
@@ -644,15 +780,18 @@ const MODEL_PROMPTS: Record<Gender, { label: string; views: [string, string] }> 
 const PRODUCT_VIEW_TYPES = [
   "Hero Front",
   "Three-Quarter",
-  "Detail Close-up",
-  "Flat Lay"
+  "Detail Close-up"
 ];
 
 const PRODUCT_VIEW_PROMPTS = [
-  "Front-facing product shot. Product perfectly centered on a pure white seamless background. Soft, even studio lighting with no harsh shadows. Clean, minimal, high-end ecommerce catalog style. The product fills about 80% of the frame.",
-  "Three-quarter angle product shot, slightly rotated to show depth and dimension. Pure white seamless background. Soft diffused studio lighting. Professional ecommerce photography. Product is the only element in frame.",
-  "Close-up detail shot focusing on the most distinctive feature -- texture, hardware, stitching, or material quality. Shallow depth of field. White background. Macro product photography style.",
-  "Top-down flat lay on a pure white surface. Product neatly arranged, perfectly symmetrical. Overhead studio lighting casting a very subtle, soft shadow. Clean catalog photography."
+  // Hero Front: garment on invisible mannequin form, dead-on perpendicular shot.
+  "HERO FRONT VIEW. The garment is shown on an invisible mannequin/ghost form so it has full 3D body shape (filled-out shoulders, chest, sleeves draping naturally). Photographed perfectly straight-on at eye level, perfectly symmetrical, head-on perpendicular to camera, NO rotation, NO angle. Camera position: dead center. Soft warm key light from camera-left at 45 degrees creating a subtle gradient down the right side, gentle fill from the right. A small soft contact shadow drops directly below the garment on the floor. The product is centered and fills about 78% of the frame vertically. No props, no people, no hangers visible. Clean luxury ecommerce hero shot in the style of Net-a-Porter or Mr Porter cover product images. (Use the BACKGROUND specified below -- that exact backdrop must fill the frame; do NOT swap to a different color or tone.)",
+
+  // Three-Quarter: rotated 35-40 degrees off-axis to make it visually distinct from front.
+  "THREE-QUARTER ANGLE. The same garment shown on an invisible mannequin form, but ROTATED EXACTLY 35-40 DEGREES off-axis to the left so the right side seam, sleeve depth, and garment silhouette curve are clearly visible from this angled perspective. The viewer should clearly see this is NOT a head-on shot -- the rotation is unmistakable. Camera position: slightly elevated, looking down at a 5 degree downward tilt. Lighting from upper-left at 60 degrees, distinctly more dimensional than the front shot, with a visible shadow gradient across the front body of the garment, sculpting depth. The product fills 70% of frame slightly off-center to the right side. Small contact shadow at the base. NO props, NO people, NO hangers visible. Editorial ecommerce style emphasizing 3D form. (Use the BACKGROUND specified below -- that exact backdrop must fill the frame; do NOT swap to a different color or tone.)",
+
+  // Detail Close-up: tight macro on a single distinctive feature, raking sidelight.
+  "EXTREME MACRO DETAIL CLOSE-UP. Crop tightly into ONE distinctive feature of the garment -- the highest-craft element such as the print/graphic, the stitching, the fabric weave, the collar, the buttons, the hardware, or the brand label. Frame fills almost entirely with the texture and detail; only that detail is in focus. Shallow depth of field with creamy out-of-focus areas at the edges. Camera is angled slightly to catch the texture in raking light. Lighting: hard sharp directional light from the left raking across the surface to reveal every fiber, every stitch, every print pixel; deep micro-shadows in the textile weave. Macro product photography in the style of luxury fabric swatch books -- aspirational, tactile, almost touchable. (The blurred areas should still pick up the BACKGROUND tone specified below so this shot reads as part of the same set.)"
 ];
 
 const getViewTypes = (gender: Gender) => [
@@ -674,6 +813,247 @@ const BACKGROUND_STYLES = [
   { id: 'warm-oak', name: 'Warm Oak', prompt: 'a minimalist warm oak wood luxury studio background' },
   { id: 'minimalist-cream', name: 'Minimalist Cream', prompt: 'a calm, minimalist cream luxury studio background' }
 ];
+
+// Aggregate every generated image for an apparel item into one flat array.
+// Order matches the way sections render top-to-bottom in the UI.
+function buildItemGallery(item: ApparelItem): GalleryImage[] {
+  const gallery: GalleryImage[] = [];
+  // Reference photos (originals)
+  item.images.forEach((img, idx) => {
+    gallery.push({ url: img.preview, label: img.label ? `Reference (${img.label})` : `Reference ${idx + 1}`, section: 'Reference' });
+  });
+  // Generated core views
+  item.views.forEach(v => gallery.push({ url: v.url, label: v.type, section: 'Studio Views' }));
+  // All style-collection buckets
+  const buckets: { list?: { view: GeneratedView; label: string }[]; section: string }[] = [
+    { list: item.campaignImages?.map(c => ({ view: c.view, label: c.objectLabel })), section: 'Campaign Scenes' },
+    { list: item.pressImages?.map(c => ({ view: c.view, label: c.paletteLabel })), section: 'Press Release' },
+    { list: item.editorialImages?.map(c => ({ view: c.view, label: c.settingLabel })), section: 'Editorial' },
+    { list: item.heritageImages?.map(c => ({ view: c.view, label: c.paletteLabel })), section: 'Heritage' },
+    { list: item.hermesImages?.map(c => ({ view: c.view, label: c.themeLabel })), section: 'Atelier' },
+    { list: item.bottegaImages?.map(c => ({ view: c.view, label: c.themeLabel })), section: 'Quiet Luxury' },
+    { list: item.saintLaurentImages?.map(c => ({ view: c.view, label: c.themeLabel })), section: 'Noir' },
+    { list: item.pradaImages?.map(c => ({ view: c.view, label: c.themeLabel })), section: 'Conceptual' },
+    { list: item.diorImages?.map(c => ({ view: c.view, label: c.themeLabel })), section: 'Couture' },
+    { list: item.jacquemusImages?.map(c => ({ view: c.view, label: c.themeLabel })), section: 'Riviera' },
+    { list: item.burberryImages?.map(c => ({ view: c.view, label: c.themeLabel })), section: 'Heritage UK' },
+    { list: item.balenciagaImages?.map(c => ({ view: c.view, label: c.themeLabel })), section: 'Dystopia' },
+  ];
+  buckets.forEach(b => {
+    b.list?.forEach(entry => gallery.push({ url: entry.view.url, label: entry.label, section: b.section }));
+  });
+  return gallery;
+}
+
+// Airbnb-style full-screen image gallery lightbox with prev/next navigation,
+// 1/N counter, share and favorite actions, keyboard + swipe support.
+function GalleryLightbox({
+  images,
+  startIndex,
+  itemId,
+  favorites,
+  onToggleFavorite,
+  onDownload,
+  onClose,
+  onNotify,
+}: {
+  images: GalleryImage[];
+  startIndex: number;
+  itemId: string;
+  favorites: Record<string, boolean>;
+  onToggleFavorite: (imageUrl: string) => void;
+  onDownload: (url: string, filename: string) => void;
+  onClose: () => void;
+  onNotify: (msg: string) => void;
+}) {
+  const [index, setIndex] = useState(startIndex);
+  const [direction, setDirection] = useState(0);
+  const thumbStripRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number | null>(null);
+  const safeIndex = Math.max(0, Math.min(index, images.length - 1));
+  const current: GalleryImage | undefined = images[safeIndex];
+
+  const go = useCallback((delta: number) => {
+    setDirection(delta);
+    setIndex(i => {
+      const next = i + delta;
+      if (next < 0) return images.length - 1;
+      if (next >= images.length) return 0;
+      return next;
+    });
+  }, [images.length]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowLeft') go(-1);
+      else if (e.key === 'ArrowRight') go(1);
+    };
+    window.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [go, onClose]);
+
+  // Auto-scroll active thumbnail into view
+  useEffect(() => {
+    const strip = thumbStripRef.current;
+    if (!strip) return;
+    const active = strip.querySelector<HTMLElement>(`[data-thumb-idx="${safeIndex}"]`);
+    if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [safeIndex]);
+
+  const onTouchStart = (e: React.TouchEvent) => { touchStartX.current = e.touches[0].clientX; };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+    touchStartX.current = null;
+  };
+
+  if (!current) return null;
+
+  const handleShare = async () => {
+    const shareData = {
+      title: current.label,
+      text: `${current.section} -- ${current.label}`,
+      url: current.url,
+    };
+    try {
+      if (typeof navigator !== 'undefined' && (navigator as any).share) {
+        await (navigator as any).share(shareData);
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(current.url);
+        onNotify('Image link copied to clipboard');
+      }
+    } catch {
+      /* share cancelled or failed -- silent */
+    }
+  };
+
+  const isFavorite = !!favorites[current.url];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-sm flex flex-col"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-4 sm:px-6 py-4 text-white flex-shrink-0">
+        <button
+          onClick={onClose}
+          className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
+          aria-label="Close gallery"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+
+        <div className="text-center">
+          <p className="text-xs text-white/50 uppercase tracking-wider">{current.section}</p>
+          <p className="text-sm font-medium">{current.label}</p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleShare}
+            className="px-3 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center gap-1.5 text-sm transition"
+            aria-label="Share"
+          >
+            <Share2 className="w-4 h-4" />
+            <span className="hidden sm:inline underline">Share</span>
+          </button>
+          <button
+            onClick={() => onToggleFavorite(current.url)}
+            className="px-3 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center gap-1.5 text-sm transition"
+            aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <Heart className={`w-4 h-4 ${isFavorite ? 'fill-rose-500 text-rose-500' : ''}`} />
+            <span className="hidden sm:inline underline">{isFavorite ? 'Saved' : 'Save'}</span>
+          </button>
+          <button
+            onClick={() => onDownload(current.url, `VPPA_${itemId}_${current.section}_${current.label}`.replace(/\s+/g, '_') + '.png')}
+            className="px-3 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center gap-1.5 text-sm transition"
+            aria-label="Download"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Save</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main image area */}
+      <div className="relative flex-1 min-h-0 flex items-center justify-center px-4 sm:px-20" onClick={onClose}>
+        <AnimatePresence mode="wait" initial={false} custom={direction}>
+          <motion.img
+            key={current.url}
+            src={current.url}
+            alt={current.label}
+            draggable={false}
+            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, x: direction > 0 ? 30 : direction < 0 ? -30 : 0 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: direction > 0 ? -30 : direction < 0 ? 30 : 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className="max-h-full max-w-full object-contain select-none rounded-lg shadow-2xl"
+          />
+        </AnimatePresence>
+
+        {/* Prev / next arrows */}
+        {images.length > 1 && (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); go(-1); }}
+              className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white hover:bg-gray-100 shadow-lg flex items-center justify-center transition"
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="w-5 h-5 text-gray-900" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); go(1); }}
+              className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white hover:bg-gray-100 shadow-lg flex items-center justify-center transition"
+              aria-label="Next image"
+            >
+              <ChevronRight className="w-5 h-5 text-gray-900" />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Counter + thumbnail strip */}
+      <div className="flex-shrink-0 pb-4 pt-2 px-4 sm:px-6">
+        <div className="text-center text-white/80 text-sm mb-3 tabular-nums">
+          {safeIndex + 1} / {images.length}
+        </div>
+        <div
+          ref={thumbStripRef}
+          className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin justify-start sm:justify-center"
+          style={{ scrollbarWidth: 'thin' }}
+        >
+          {images.map((img, i) => (
+            <button
+              key={`${img.url}_${i}`}
+              data-thumb-idx={i}
+              onClick={() => { setDirection(i - safeIndex); setIndex(i); }}
+              className={`flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-lg overflow-hidden transition-all ${
+                i === safeIndex ? 'ring-2 ring-white scale-105' : 'opacity-50 hover:opacity-80'
+              }`}
+              aria-label={`Go to image ${i + 1}`}
+            >
+              <img src={img.url} alt={img.label} className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [email, setEmail] = useState('');
@@ -805,6 +1185,8 @@ function StudioApp() {
   const [isGeneratingBalenciaga, setIsGeneratingBalenciaga] = useState(false);
   const [campaignTab, setCampaignTab] = useState<'scenes' | 'press' | 'editorial' | 'heritage' | 'hermes' | 'bottega' | 'saintlaurent' | 'prada' | 'dior' | 'jacquemus' | 'burberry' | 'balenciaga'>('scenes');
   const [toast, setToast] = useState<{ kind: 'error' | 'info'; message: string } | null>(null);
+  const [regeneratingViews, setRegeneratingViews] = useState<Set<string>>(new Set());
+  const [zippingItems, setZippingItems] = useState<Set<string>>(new Set());
 
   const showToast = (kind: 'error' | 'info', message: string) => {
     setToast({ kind, message });
@@ -816,14 +1198,13 @@ function StudioApp() {
 
   const describeError = (err: any): string => {
     const msg = typeof err?.message === 'string' ? err.message : '';
-    if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('"code":429')) {
-      if (msg.includes('limit: 0') || msg.includes('limit":0')) {
-        return 'The image model is not available on the free tier. Enable billing at ai.google.dev or switch to a free-tier model.';
-      }
-      return 'Rate limit hit. Slow down batch size or wait a minute before retrying.';
-    }
-    if (msg.includes('API key') || msg.includes('API_KEY')) return 'Invalid or missing GEMINI_API_KEY. Check .env and rebuild.';
-    if (msg.includes('SAFETY') || msg.includes('blocked')) return 'Prompt was blocked by safety filters. Try a different theme.';
+    if (/RUNWARE_API_KEY/i.test(msg)) return 'Missing RUNWARE_API_KEY. Check .env and rebuild.';
+    if (/invalid api key|invalidapikey/i.test(msg)) return 'Invalid Runware API key. Check .env and rebuild.';
+    if (/insufficient|balance|credit/i.test(msg)) return 'Runware account is out of credits. Top up at my.runware.ai.';
+    if (/\b(429|rate ?limit|too many)\b/i.test(msg)) return 'Rate limit hit on Runware. Slow down batch size or wait a minute before retrying.';
+    if (/RESOURCE_EXHAUSTED|"code":429/.test(msg)) return 'Gemini analysis quota hit. Wait a minute or switch keys.';
+    if (/GEMINI_API_KEY|API_KEY/.test(msg)) return 'Invalid or missing GEMINI_API_KEY. Check .env and rebuild.';
+    if (/SAFETY|blocked|safety/i.test(msg)) return 'Prompt was blocked by safety filters. Try a different theme.';
     return msg.slice(0, 200) || 'Image generation failed. Check browser console for details.';
   };
 
@@ -1058,6 +1439,166 @@ function StudioApp() {
     document.body.removeChild(link);
   };
 
+  const downloadAllAsZip = async (item: ApparelItem) => {
+    if (!item.views.length) return;
+    setZippingItems(prev => new Set(prev).add(item.id));
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder(`VPPA_${item.id}`) || zip;
+      for (let i = 0; i < item.views.length; i++) {
+        const v = item.views[i];
+        const safeName = `${String(i + 1).padStart(2, '0')}_${(v.type || `view_${i + 1}`).replace(/\s+/g, '_')}.png`;
+        const dataMatch = v.url.match(/^data:[^;]+;base64,(.+)$/);
+        if (dataMatch) {
+          folder.file(safeName, dataMatch[1], { base64: true });
+        } else {
+          const blob = await (await fetch(v.url)).blob();
+          folder.file(safeName, blob);
+        }
+      }
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `VPPA_${item.id}_views.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(objectUrl);
+    } catch (e) {
+      console.error('ZIP download failed:', e);
+      showToast('error', `Download failed: ${describeError(e)}`);
+    } finally {
+      setZippingItems(prev => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  };
+
+  const regenerateView = async (itemId: string, viewIdx: number) => {
+    const item = apparelItems.find(f => f.id === itemId);
+    if (!item || item.images.length === 0) return;
+    const key = `${itemId}:${viewIdx}`;
+    if (regeneratingViews.has(key)) return;
+
+    setRegeneratingViews(prev => new Set(prev).add(key));
+    try {
+      const logoBase64 = logo ? await fileToBase64(logo.file) : null;
+      const imageDataParts: { data: string; mimeType: string }[] = [];
+      for (const img of item.images) {
+        const base64 = await fileToBase64(img.file);
+        imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
+      }
+
+      const viewTypes = getViewTypes(selectedGender);
+      const viewPrompts = getViewPrompts(selectedGender, selectedEthnicity);
+      if (viewIdx < 0 || viewIdx >= viewPrompts.length) return;
+
+      const analysis = item.analysis || '';
+      const isPrinted = item.uploadMode === 'printed';
+      const printedRule = isPrinted
+        ? `\n- CRITICAL: This is a PRINTED garment. The FRONT and BACK have DIFFERENT prints/graphics. Image 1 is FRONT, Image 2 is BACK. Reproduce the EXACT prints on the correct sides. The prints must be clearly visible and accurate.`
+        : '';
+      const analysisContext = analysis
+        ? `\n\nPRODUCT DETAILS (from analysis):\n${analysis}\n\nREPRODUCE THIS EXACT PRODUCT with all its specific colors, materials, prints, and details.`
+        : '';
+      const isModelShot = viewIdx < 2;
+
+      const parts: any[] = imageDataParts.map(img => ({
+        inlineData: { data: img.data, mimeType: img.mimeType }
+      }));
+      if (logoBase64) {
+        parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
+      }
+
+      parts.push({
+        text: isModelShot
+          ? `Generate a professional luxury commercial-catalog photograph.
+
+${viewPrompts[viewIdx]}
+${analysisContext}
+
+BACKGROUND (MANDATORY -- this exact backdrop must appear; ignore any "editorial / moody / dark" instincts):
+- The backdrop is exclusively ${selectedStyle.prompt}.
+- It must be a clean, evenly lit studio setting in this exact tone -- NOT dark, NOT black, NOT atmospheric, NOT vignetted, NOT a nightclub or photo-studio with dark seamless paper. The same flat backdrop tone fills the entire frame edge-to-edge.
+- This SAME backdrop is used for the front, lifestyle, and all four product shots in this set, so the shots feel like one consistent photo session.
+
+CRITICAL RULES:
+- This must look like a real high-end commercial-catalog photograph, NOT a render or illustration.
+- The model must be wearing THIS EXACT product from the reference images -- same colors, same materials, same details.${printedRule}
+- Lighting: bright, soft, even key from camera-left at 45 degrees with a soft fill from the right. Daylight balanced 5500K. NO hard rim lighting. NO low-key chiaroscuro. NO single-light moody setup. NO atmospheric haze.
+- The product must be clearly visible and recognizable on the model.
+- ${logoBase64 ? 'The provided logo should appear subtly as a small brand mark in the bottom corner of the image, NOT on the product.' : 'No additional branding.'}
+- Square 1:1 composition.
+
+Also provide a one-sentence product description.`
+          : `Generate a professional luxury ecommerce product photograph.
+
+SHOT TYPE (FOLLOW THESE INSTRUCTIONS EXACTLY -- camera angle, framing, AND lighting are ALL specified by this shot type and override any defaults):
+${viewPrompts[viewIdx]}
+
+BACKGROUND (MANDATORY -- this exact backdrop must appear; ignore any "pure white" or other default in the SHOT TYPE):
+- The backdrop is exclusively ${selectedStyle.prompt}.
+- Clean, seamless, no textures or patterns on the background. The same flat backdrop tone fills the entire frame edge-to-edge.
+- This SAME backdrop is used for the on-model shots and the four product shots in this set, so the shots feel like one consistent photo session and the model shots and product shots share the same backdrop tone.
+${analysisContext}
+
+CRITICAL RULES:
+- This must look like a real photograph taken in a professional studio, NOT a render or illustration.
+- Reproduce the EXACT product from the reference images -- same colors, same materials, same details, same branding.${printedRule}
+- The SHOT TYPE block fully controls camera angle, framing, and per-subject lighting. Do NOT default to a generic catalog look -- follow the SHOT TYPE instructions literally so this shot is visually distinct from the other product shots.
+- The BACKGROUND block fully controls backdrop color and tone -- if the SHOT TYPE block mentions a different background, IGNORE that and use the BACKGROUND block's backdrop instead.
+- Product must be clean, crisp, and perfectly presented.
+- NOTHING else in the frame -- no props, no text, no watermarks, no mannequins, no people.
+- ${logoBase64 ? 'The provided logo should appear subtly as a small brand mark in the bottom corner of the image, NOT on the product.' : 'No additional branding.'}
+- Square 1:1 composition.
+
+Also provide a one-sentence product description.`,
+      });
+
+      const response = await callImageGenWithRetry({
+        model: IMAGE_MODEL,
+        contents: { parts },
+        config: {
+          imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' }
+        }
+      });
+
+      let url = '';
+      let desc = '';
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) url = `data:image/png;base64,${part.inlineData.data}`;
+        else if (part.text) desc = part.text;
+      }
+
+      if (!url) throw new Error('Empty response from image generator.');
+
+      setApparelItems(prev => prev.map(f => {
+        if (f.id !== itemId) return f;
+        const newViews = [...f.views];
+        const replacement: GeneratedView = {
+          url,
+          type: viewTypes[viewIdx],
+          description: desc || newViews[viewIdx]?.description || `Luxury ${viewTypes[viewIdx]} shot.`
+        };
+        if (viewIdx < newViews.length) newViews[viewIdx] = replacement;
+        else newViews.push(replacement);
+        return { ...f, views: newViews };
+      }));
+    } catch (e) {
+      console.error(`Regenerate view ${viewIdx} failed:`, e);
+      showToast('error', `Regenerate failed: ${describeError(e)}`);
+    } finally {
+      setRegeneratingViews(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
   const generateImages = async () => {
     if (apparelItems.length === 0) return;
 
@@ -1162,15 +1703,14 @@ Be EXTREMELY precise about the prints/graphics. Every detail matters -- the imag
         setApparelItems(prev => prev.map(f => f.id === item.id ? { ...f, status: 'processing', currentProcessingIndex: 0 } : f));
 
         const existingViews = settingsChanged ? [] : item.views;
-        const generatedViews: GeneratedView[] = [];
-
+        const viewSlots: (GeneratedView | undefined)[] = new Array(viewPrompts.length);
         for (let v = 0; v < viewPrompts.length; v++) {
-          if (existingViews[v]) {
-            generatedViews.push(existingViews[v]);
-            continue;
-          }
+          if (existingViews[v]) viewSlots[v] = existingViews[v];
+        }
+        let viewsCompleted = viewSlots.filter(Boolean).length;
 
-          setApparelItems(prev => prev.map(f => f.id === item.id ? { ...f, currentProcessingIndex: v } : f));
+        await runWithConcurrency(viewPrompts.length, MAX_PARALLEL_IMAGE_GEN, async (v) => {
+          if (viewSlots[v]) return;
 
           const parts: any[] = imageDataParts.map(img => ({
             inlineData: { data: img.data, mimeType: img.mimeType }
@@ -1193,16 +1733,20 @@ Be EXTREMELY precise about the prints/graphics. Every detail matters -- the imag
 
           parts.push({
             text: isModelShot
-              ? `Generate a professional luxury fashion editorial photograph.
+              ? `Generate a professional luxury commercial-catalog photograph.
 
 ${viewPrompts[v]}
 ${analysisContext}
 
+BACKGROUND (MANDATORY -- this exact backdrop must appear; ignore any "editorial / moody / dark" instincts):
+- The backdrop is exclusively ${selectedStyle.prompt}.
+- It must be a clean, evenly lit studio setting in this exact tone -- NOT dark, NOT black, NOT atmospheric, NOT vignetted, NOT a nightclub or photo-studio with dark seamless paper. The same flat backdrop tone fills the entire frame edge-to-edge.
+- This SAME backdrop is used for the front, lifestyle, and all four product shots in this set, so the shots feel like one consistent photo session.
+
 CRITICAL RULES:
-- This must look like a real high-end fashion photograph, NOT a render or illustration.
+- This must look like a real high-end commercial-catalog photograph, NOT a render or illustration.
 - The model must be wearing THIS EXACT product from the reference images -- same colors, same materials, same details.${printedRule}
-- BACKGROUND: ${selectedStyle.prompt}. Clean studio setting.
-- Professional fashion photography lighting -- soft, flattering beauty lighting.
+- Lighting: bright, soft, even key from camera-left at 45 degrees with a soft fill from the right. Daylight balanced 5500K. NO hard rim lighting. NO low-key chiaroscuro. NO single-light moody setup. NO atmospheric haze.
 - The product must be clearly visible and recognizable on the model.
 - ${logoBase64 ? 'The provided logo should appear subtly as a small brand mark in the bottom corner of the image, NOT on the product.' : 'No additional branding.'}
 - Square 1:1 composition.
@@ -1210,15 +1754,20 @@ CRITICAL RULES:
 Also provide a one-sentence product description.`
               : `Generate a professional luxury ecommerce product photograph.
 
-SHOT TYPE: ${viewPrompts[v]}
+SHOT TYPE (FOLLOW THESE INSTRUCTIONS EXACTLY -- camera angle, framing, AND lighting are ALL specified by this shot type and override any defaults):
+${viewPrompts[v]}
 
-BACKGROUND: ${selectedStyle.prompt}. Clean, seamless, no textures or patterns on the background.
+BACKGROUND (MANDATORY -- this exact backdrop must appear; ignore any "pure white" or other default in the SHOT TYPE):
+- The backdrop is exclusively ${selectedStyle.prompt}.
+- Clean, seamless, no textures or patterns on the background. The same flat backdrop tone fills the entire frame edge-to-edge.
+- This SAME backdrop is used for the on-model shots and the four product shots in this set, so the shots feel like one consistent photo session and the model shots and product shots share the same backdrop tone.
 ${analysisContext}
 
 CRITICAL RULES:
 - This must look like a real photograph taken in a professional studio, NOT a render or illustration.
 - Reproduce the EXACT product from the reference images -- same colors, same materials, same details, same branding.${printedRule}
-- Soft, diffused studio lighting. No harsh shadows. Subtle contact shadow only.
+- The SHOT TYPE block fully controls camera angle, framing, and per-subject lighting. Do NOT default to a generic catalog look -- follow the SHOT TYPE instructions literally so this shot is visually distinct from the other product shots.
+- The BACKGROUND block fully controls backdrop color and tone -- if the SHOT TYPE block mentions a different background, IGNORE that and use the BACKGROUND block's backdrop instead.
 - Product must be clean, crisp, and perfectly presented.
 - NOTHING else in the frame -- no props, no text, no watermarks, no mannequins, no people.
 - ${logoBase64 ? 'The provided logo should appear subtly as a small brand mark in the bottom corner of the image, NOT on the product.' : 'No additional branding.'}
@@ -1232,7 +1781,7 @@ Also provide a one-sentence product description.`,
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: "1K" }
+                imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' }
               }
             });
 
@@ -1244,26 +1793,30 @@ Also provide a one-sentence product description.`,
             }
 
             if (url) {
-              generatedViews.push({
+              viewSlots[v] = {
                 url,
                 type: viewTypes[v],
                 description: desc || `Luxury ${viewTypes[v]} shot.`
-              });
-              
-              setApparelItems(prev => prev.map(f => f.id === item.id ? { ...f, views: [...generatedViews] } : f));
+              };
             }
-            
-            await sleep(1000);
-            
           } catch (viewError) {
             console.error(`Failed to generate view ${v}:`, viewError);
             showToast('error', `View ${v + 1}: ${describeError(viewError)}`);
+          } finally {
+            viewsCompleted++;
+            const cleaned = viewSlots.filter((g): g is GeneratedView => Boolean(g));
+            setApparelItems(prev => prev.map(f => f.id === item.id ? {
+              ...f,
+              views: cleaned,
+              currentProcessingIndex: viewsCompleted < viewPrompts.length ? viewsCompleted : undefined
+            } : f));
           }
-        }
+        });
 
-        setApparelItems(prev => prev.map(f => f.id === item.id ? { 
-          ...f, 
-          status: generatedViews.length > 0 ? 'completed' : 'error',
+        const finalViews = viewSlots.filter((g): g is GeneratedView => Boolean(g));
+        setApparelItems(prev => prev.map(f => f.id === item.id ? {
+          ...f,
+          status: finalViews.length > 0 ? 'completed' : 'error',
           currentProcessingIndex: undefined,
           generatedStyleId: currentSettingsKey
         } : f));
@@ -1432,15 +1985,11 @@ Also provide a one-sentence product description.`,
           ? applyEthnicity("a single young Indian woman, age 20-26, elegant features, medium-brown skin, styled dark hair, confident expression", selectedEthnicity, 'women')
           : applyEthnicity("a single young Indian man, age 20-26, sharp features, medium-brown skin, well-groomed hair, confident expression", selectedEthnicity, 'men');
 
-        const generatedCampaigns: { objectId: string; objectLabel: string; view: GeneratedView }[] = [];
+        const campaignSlots: ({ objectId: string; objectLabel: string; view: GeneratedView } | undefined)[] = new Array(scenesToGenerate.length);
+        let campaignsCompleted = 0;
 
-        for (let si = 0; si < scenesToGenerate.length; si++) {
+        await runWithConcurrency(scenesToGenerate.length, MAX_PARALLEL_IMAGE_GEN, async (si) => {
           const scene = scenesToGenerate[si];
-
-          setApparelItems(prev => prev.map(i => i.id === item.id ? {
-            ...i,
-            campaignProgress: { current: si, total: scenesToGenerate.length }
-          } : i));
 
           const parts: any[] = imageDataParts.map(img => ({
             inlineData: { data: img.data, mimeType: img.mimeType }
@@ -1510,7 +2059,7 @@ Reproduce the EXACT apparel from the provided reference images on the model. Out
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: "1K" }
+                imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' }
               }
             });
 
@@ -1522,27 +2071,30 @@ Reproduce the EXACT apparel from the provided reference images on the model. Out
             }
 
             if (url) {
-              generatedCampaigns.push({
+              campaignSlots[si] = {
                 objectId: scene.id,
                 objectLabel: scene.label,
                 view: { url, type: scene.label, description: desc || `VPPA x ${scene.label}` }
-              });
-              setApparelItems(prev => prev.map(i => i.id === item.id ? {
-                ...i,
-                campaignImages: [...generatedCampaigns]
-              } : i));
+              };
             }
-
-            await sleep(1000);
           } catch (err) {
             console.error(`Campaign generation failed for ${scene.label}:`, err);
             showToast('error', `${scene.label}: ${describeError(err)}`);
+          } finally {
+            campaignsCompleted++;
+            const cleaned = campaignSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+            setApparelItems(prev => prev.map(i => i.id === item.id ? {
+              ...i,
+              campaignImages: cleaned,
+              campaignProgress: { current: campaignsCompleted, total: scenesToGenerate.length }
+            } : i));
           }
-        }
+        });
 
+        const finalCampaigns = campaignSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
         setApparelItems(prev => prev.map(i => i.id === item.id ? {
           ...i,
-          campaignStatus: generatedCampaigns.length > 0 ? 'completed' : 'error',
+          campaignStatus: finalCampaigns.length > 0 ? 'completed' : 'error',
           campaignProgress: undefined
         } : i));
       }
@@ -1581,15 +2133,11 @@ Reproduce the EXACT apparel from the provided reference images on the model. Out
           imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
         }
 
-        const generatedPress: { paletteId: string; paletteLabel: string; view: GeneratedView }[] = [];
+        const pressSlots: ({ paletteId: string; paletteLabel: string; view: GeneratedView } | undefined)[] = new Array(palettesToGenerate.length);
+        let pressCompleted = 0;
 
-        for (let pi = 0; pi < palettesToGenerate.length; pi++) {
+        await runWithConcurrency(palettesToGenerate.length, MAX_PARALLEL_IMAGE_GEN, async (pi) => {
           const palette = palettesToGenerate[pi];
-
-          setApparelItems(prev => prev.map(i => i.id === item.id ? {
-            ...i,
-            pressProgress: { current: pi, total: palettesToGenerate.length }
-          } : i));
 
           const parts: any[] = imageDataParts.map(img => ({
             inlineData: { data: img.data, mimeType: img.mimeType }
@@ -1657,7 +2205,7 @@ Reproduce the EXACT apparel from the provided reference images with full materia
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: "1K" }
+                imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' }
               }
             });
 
@@ -1669,27 +2217,30 @@ Reproduce the EXACT apparel from the provided reference images with full materia
             }
 
             if (url) {
-              generatedPress.push({
+              pressSlots[pi] = {
                 paletteId: palette.id,
                 paletteLabel: palette.label,
                 view: { url, type: palette.label, description: desc || `VPPA press · ${palette.label}` }
-              });
-              setApparelItems(prev => prev.map(i => i.id === item.id ? {
-                ...i,
-                pressImages: [...generatedPress]
-              } : i));
+              };
             }
-
-            await sleep(1000);
           } catch (err) {
             console.error(`Press generation failed for ${palette.label}:`, err);
             showToast('error', `${palette.label}: ${describeError(err)}`);
+          } finally {
+            pressCompleted++;
+            const cleaned = pressSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+            setApparelItems(prev => prev.map(i => i.id === item.id ? {
+              ...i,
+              pressImages: cleaned,
+              pressProgress: { current: pressCompleted, total: palettesToGenerate.length }
+            } : i));
           }
-        }
+        });
 
+        const finalPress = pressSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
         setApparelItems(prev => prev.map(i => i.id === item.id ? {
           ...i,
-          pressStatus: generatedPress.length > 0 ? 'completed' : 'error',
+          pressStatus: finalPress.length > 0 ? 'completed' : 'error',
           pressProgress: undefined
         } : i));
       }
@@ -1732,15 +2283,11 @@ Reproduce the EXACT apparel from the provided reference images with full materia
           ? applyEthnicity("a single young Indian woman, age 20-26, elegant features, medium-brown skin, styled dark hair, natural beauty, understated confidence", selectedEthnicity, 'women')
           : applyEthnicity("a single young Indian man, age 20-26, sharp features, medium-brown skin, well-groomed hair, quiet confidence", selectedEthnicity, 'men');
 
-        const generatedEditorial: { settingId: string; settingLabel: string; view: GeneratedView }[] = [];
+        const editorialSlots: ({ settingId: string; settingLabel: string; view: GeneratedView } | undefined)[] = new Array(settingsToGenerate.length);
+        let editorialCompleted = 0;
 
-        for (let si = 0; si < settingsToGenerate.length; si++) {
+        await runWithConcurrency(settingsToGenerate.length, MAX_PARALLEL_IMAGE_GEN, async (si) => {
           const setting = settingsToGenerate[si];
-
-          setApparelItems(prev => prev.map(i => i.id === item.id ? {
-            ...i,
-            editorialProgress: { current: si, total: settingsToGenerate.length }
-          } : i));
 
           const parts: any[] = imageDataParts.map(img => ({
             inlineData: { data: img.data, mimeType: img.mimeType }
@@ -1782,7 +2329,7 @@ MOOD REFERENCE: Zara SS/AW Studio campaigns, Massimo Dutti lookbook, Arket ensem
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: "1K" }
+                imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' }
               }
             });
 
@@ -1794,27 +2341,30 @@ MOOD REFERENCE: Zara SS/AW Studio campaigns, Massimo Dutti lookbook, Arket ensem
             }
 
             if (url) {
-              generatedEditorial.push({
+              editorialSlots[si] = {
                 settingId: setting.id,
                 settingLabel: setting.label,
                 view: { url, type: setting.label, description: desc || `VPPA editorial · ${setting.label}` }
-              });
-              setApparelItems(prev => prev.map(i => i.id === item.id ? {
-                ...i,
-                editorialImages: [...generatedEditorial]
-              } : i));
+              };
             }
-
-            await sleep(1000);
           } catch (err) {
             console.error(`Editorial generation failed for ${setting.label}:`, err);
             showToast('error', `${setting.label}: ${describeError(err)}`);
+          } finally {
+            editorialCompleted++;
+            const cleaned = editorialSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+            setApparelItems(prev => prev.map(i => i.id === item.id ? {
+              ...i,
+              editorialImages: cleaned,
+              editorialProgress: { current: editorialCompleted, total: settingsToGenerate.length }
+            } : i));
           }
-        }
+        });
 
+        const finalEditorial = editorialSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
         setApparelItems(prev => prev.map(i => i.id === item.id ? {
           ...i,
-          editorialStatus: generatedEditorial.length > 0 ? 'completed' : 'error',
+          editorialStatus: finalEditorial.length > 0 ? 'completed' : 'error',
           editorialProgress: undefined
         } : i));
       }
@@ -1857,15 +2407,11 @@ MOOD REFERENCE: Zara SS/AW Studio campaigns, Massimo Dutti lookbook, Arket ensem
           ? applyEthnicity("a single young Indian woman, age 22-28, refined features, medium-brown skin, elegantly styled dark hair, sophisticated editorial expression", selectedEthnicity, 'women')
           : applyEthnicity("a single young Indian man, age 22-28, aristocratic features, medium-brown skin, perfectly groomed hair, sophisticated editorial expression", selectedEthnicity, 'men');
 
-        const generatedHeritage: { paletteId: string; paletteLabel: string; view: GeneratedView }[] = [];
+        const heritageSlots: ({ paletteId: string; paletteLabel: string; view: GeneratedView } | undefined)[] = new Array(palettesToGenerate.length);
+        let heritageCompleted = 0;
 
-        for (let pi = 0; pi < palettesToGenerate.length; pi++) {
+        await runWithConcurrency(palettesToGenerate.length, MAX_PARALLEL_IMAGE_GEN, async (pi) => {
           const palette = palettesToGenerate[pi];
-
-          setApparelItems(prev => prev.map(i => i.id === item.id ? {
-            ...i,
-            heritageProgress: { current: pi, total: palettesToGenerate.length }
-          } : i));
 
           const parts: any[] = imageDataParts.map(img => ({
             inlineData: { data: img.data, mimeType: img.mimeType }
@@ -1933,7 +2479,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: "1K" }
+                imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' }
               }
             });
 
@@ -1945,27 +2491,30 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             }
 
             if (url) {
-              generatedHeritage.push({
+              heritageSlots[pi] = {
                 paletteId: palette.id,
                 paletteLabel: palette.label,
                 view: { url, type: palette.label, description: desc || `VPPA heritage · ${palette.label}` }
-              });
-              setApparelItems(prev => prev.map(i => i.id === item.id ? {
-                ...i,
-                heritageImages: [...generatedHeritage]
-              } : i));
+              };
             }
-
-            await sleep(1000);
           } catch (err) {
             console.error(`Heritage generation failed for ${palette.label}:`, err);
             showToast('error', `${palette.label}: ${describeError(err)}`);
+          } finally {
+            heritageCompleted++;
+            const cleaned = heritageSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+            setApparelItems(prev => prev.map(i => i.id === item.id ? {
+              ...i,
+              heritageImages: cleaned,
+              heritageProgress: { current: heritageCompleted, total: palettesToGenerate.length }
+            } : i));
           }
-        }
+        });
 
+        const finalHeritage = heritageSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
         setApparelItems(prev => prev.map(i => i.id === item.id ? {
           ...i,
-          heritageStatus: generatedHeritage.length > 0 ? 'completed' : 'error',
+          heritageStatus: finalHeritage.length > 0 ? 'completed' : 'error',
           heritageProgress: undefined
         } : i));
       }
@@ -2002,15 +2551,11 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
           imageDataParts.push({ data: base64, mimeType: getMimeType(img.file) });
         }
 
-        const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
+        const hermesSlots: ({ themeId: string; themeLabel: string; view: GeneratedView } | undefined)[] = new Array(themesToGenerate.length);
+        let hermesCompleted = 0;
 
-        for (let pi = 0; pi < themesToGenerate.length; pi++) {
+        await runWithConcurrency(themesToGenerate.length, MAX_PARALLEL_IMAGE_GEN, async (pi) => {
           const theme = themesToGenerate[pi];
-
-          setApparelItems(prev => prev.map(i => i.id === item.id ? {
-            ...i,
-            hermesProgress: { current: pi, total: themesToGenerate.length }
-          } : i));
 
           const parts: any[] = imageDataParts.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } }));
           if (logoBase64) parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
@@ -2064,7 +2609,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             const response = await callImageGenWithRetry({
               model: IMAGE_MODEL,
               contents: { parts },
-              config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
+              config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } }
             });
 
             let url = '';
@@ -2075,19 +2620,26 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             }
 
             if (url) {
-              generated.push({ themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA atelier · ${theme.label}` } });
-              setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, hermesImages: [...generated] } : i));
+              hermesSlots[pi] = { themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA atelier · ${theme.label}` } };
             }
-            await sleep(1000);
           } catch (err) {
             console.error(`Hermes generation failed for ${theme.label}:`, err);
             showToast('error', `${theme.label}: ${describeError(err)}`);
+          } finally {
+            hermesCompleted++;
+            const cleaned = hermesSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+            setApparelItems(prev => prev.map(i => i.id === item.id ? {
+              ...i,
+              hermesImages: cleaned,
+              hermesProgress: { current: hermesCompleted, total: themesToGenerate.length }
+            } : i));
           }
-        }
+        });
 
+        const finalHermes = hermesSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
         setApparelItems(prev => prev.map(i => i.id === item.id ? {
           ...i,
-          hermesStatus: generated.length > 0 ? 'completed' : 'error',
+          hermesStatus: finalHermes.length > 0 ? 'completed' : 'error',
           hermesProgress: undefined
         } : i));
       }
@@ -2128,15 +2680,11 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
           ? applyEthnicity("a single young Indian woman, age 22-28, refined natural features, medium-brown skin, undone tousled hair, no visible makeup, gaze quiet and unposed", selectedEthnicity, 'women')
           : applyEthnicity("a single young Indian man, age 22-28, natural features, medium-brown skin, slightly tousled hair, gaze quiet and unposed", selectedEthnicity, 'men');
 
-        const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
+        const bottegaSlots: ({ themeId: string; themeLabel: string; view: GeneratedView } | undefined)[] = new Array(themesToGenerate.length);
+        let bottegaCompleted = 0;
 
-        for (let pi = 0; pi < themesToGenerate.length; pi++) {
+        await runWithConcurrency(themesToGenerate.length, MAX_PARALLEL_IMAGE_GEN, async (pi) => {
           const theme = themesToGenerate[pi];
-
-          setApparelItems(prev => prev.map(i => i.id === item.id ? {
-            ...i,
-            bottegaProgress: { current: pi, total: themesToGenerate.length }
-          } : i));
 
           const parts: any[] = imageDataParts.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } }));
           if (logoBase64) parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
@@ -2196,7 +2744,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             const response = await callImageGenWithRetry({
               model: IMAGE_MODEL,
               contents: { parts },
-              config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
+              config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } }
             });
 
             let url = '';
@@ -2207,19 +2755,26 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             }
 
             if (url) {
-              generated.push({ themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA quiet · ${theme.label}` } });
-              setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, bottegaImages: [...generated] } : i));
+              bottegaSlots[pi] = { themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA quiet · ${theme.label}` } };
             }
-            await sleep(1000);
           } catch (err) {
             console.error(`Bottega generation failed for ${theme.label}:`, err);
             showToast('error', `${theme.label}: ${describeError(err)}`);
+          } finally {
+            bottegaCompleted++;
+            const cleaned = bottegaSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+            setApparelItems(prev => prev.map(i => i.id === item.id ? {
+              ...i,
+              bottegaImages: cleaned,
+              bottegaProgress: { current: bottegaCompleted, total: themesToGenerate.length }
+            } : i));
           }
-        }
+        });
 
+        const finalBottega = bottegaSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
         setApparelItems(prev => prev.map(i => i.id === item.id ? {
           ...i,
-          bottegaStatus: generated.length > 0 ? 'completed' : 'error',
+          bottegaStatus: finalBottega.length > 0 ? 'completed' : 'error',
           bottegaProgress: undefined
         } : i));
       }
@@ -2260,15 +2815,11 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
           ? applyEthnicity("a single young Indian woman, age 22-28, sharp angular features, medium-brown skin, slick dark hair, smoky-eye attitude, defiant editorial gaze", selectedEthnicity, 'women')
           : applyEthnicity("a single young Indian man, age 22-28, sharp angular features, medium-brown skin, slick dark hair, brooding rock-noir attitude", selectedEthnicity, 'men');
 
-        const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
+        const saintLaurentSlots: ({ themeId: string; themeLabel: string; view: GeneratedView } | undefined)[] = new Array(themesToGenerate.length);
+        let saintLaurentCompleted = 0;
 
-        for (let pi = 0; pi < themesToGenerate.length; pi++) {
+        await runWithConcurrency(themesToGenerate.length, MAX_PARALLEL_IMAGE_GEN, async (pi) => {
           const theme = themesToGenerate[pi];
-
-          setApparelItems(prev => prev.map(i => i.id === item.id ? {
-            ...i,
-            saintLaurentProgress: { current: pi, total: themesToGenerate.length }
-          } : i));
 
           const parts: any[] = imageDataParts.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } }));
           if (logoBase64) parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
@@ -2325,7 +2876,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             const response = await callImageGenWithRetry({
               model: IMAGE_MODEL,
               contents: { parts },
-              config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
+              config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } }
             });
 
             let url = '';
@@ -2336,19 +2887,26 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             }
 
             if (url) {
-              generated.push({ themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA noir · ${theme.label}` } });
-              setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, saintLaurentImages: [...generated] } : i));
+              saintLaurentSlots[pi] = { themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA noir · ${theme.label}` } };
             }
-            await sleep(1000);
           } catch (err) {
             console.error(`SaintLaurent generation failed for ${theme.label}:`, err);
             showToast('error', `${theme.label}: ${describeError(err)}`);
+          } finally {
+            saintLaurentCompleted++;
+            const cleaned = saintLaurentSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+            setApparelItems(prev => prev.map(i => i.id === item.id ? {
+              ...i,
+              saintLaurentImages: cleaned,
+              saintLaurentProgress: { current: saintLaurentCompleted, total: themesToGenerate.length }
+            } : i));
           }
-        }
+        });
 
+        const finalSaintLaurent = saintLaurentSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
         setApparelItems(prev => prev.map(i => i.id === item.id ? {
           ...i,
-          saintLaurentStatus: generated.length > 0 ? 'completed' : 'error',
+          saintLaurentStatus: finalSaintLaurent.length > 0 ? 'completed' : 'error',
           saintLaurentProgress: undefined
         } : i));
       }
@@ -2377,10 +2935,10 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         const modelDescription = selectedGender === 'women'
           ? applyEthnicity("a single young Indian woman, age 22-28, sharp intellectual features, medium-brown skin, severe minimalist hair, no smile, deadpan editorial gaze", selectedEthnicity, 'women')
           : applyEthnicity("a single young Indian man, age 22-28, sharp intellectual features, medium-brown skin, severe combed hair, deadpan editorial gaze", selectedEthnicity, 'men');
-        const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
-        for (let pi = 0; pi < themesToGenerate.length; pi++) {
+        const pradaSlots: ({ themeId: string; themeLabel: string; view: GeneratedView } | undefined)[] = new Array(themesToGenerate.length);
+        let pradaCompleted = 0;
+        await runWithConcurrency(themesToGenerate.length, MAX_PARALLEL_IMAGE_GEN, async (pi) => {
           const theme = themesToGenerate[pi];
-          setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, pradaProgress: { current: pi, total: themesToGenerate.length } } : i));
           const parts: any[] = imageDataParts.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } }));
           if (logoBase64) parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
           const priceCopy = item.price?.trim() ? `₹${item.price.trim().replace(/^₹\s*/, '')}` : '';
@@ -2412,23 +2970,26 @@ MOOD REFERENCE: Prada SS24 / Miu Miu Pre-Spring campaigns, Steven Meisel for Pra
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
               else if (p.text) desc = p.text;
             }
             if (url) {
-              generated.push({ themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA conceptual · ${theme.label}` } });
-              setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, pradaImages: [...generated] } : i));
+              pradaSlots[pi] = { themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA conceptual · ${theme.label}` } };
             }
-            await sleep(1000);
           } catch (err) {
             console.error(`Prada generation failed for ${theme.label}:`, err);
             showToast('error', `${theme.label}: ${describeError(err)}`);
+          } finally {
+            pradaCompleted++;
+            const cleaned = pradaSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+            setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, pradaImages: cleaned, pradaProgress: { current: pradaCompleted, total: themesToGenerate.length } } : i));
           }
-        }
-        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, pradaStatus: generated.length > 0 ? 'completed' : 'error', pradaProgress: undefined } : i));
+        });
+        const finalPrada = pradaSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, pradaStatus: finalPrada.length > 0 ? 'completed' : 'error', pradaProgress: undefined } : i));
       }
     } finally { setIsGeneratingPrada(false); }
   };
@@ -2453,10 +3014,10 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         const modelDescription = selectedGender === 'women'
           ? applyEthnicity("a single young Indian woman, age 22-28, refined romantic features, medium-brown skin, softly styled dark hair, painterly haute couture beauty, subtle warm makeup", selectedEthnicity, 'women')
           : applyEthnicity("a single young Indian man, age 22-28, classical aristocratic features, medium-brown skin, softly styled dark hair, painterly couture refinement", selectedEthnicity, 'men');
-        const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
-        for (let pi = 0; pi < themesToGenerate.length; pi++) {
+        const diorSlots: ({ themeId: string; themeLabel: string; view: GeneratedView } | undefined)[] = new Array(themesToGenerate.length);
+        let diorCompleted = 0;
+        await runWithConcurrency(themesToGenerate.length, MAX_PARALLEL_IMAGE_GEN, async (pi) => {
           const theme = themesToGenerate[pi];
-          setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, diorProgress: { current: pi, total: themesToGenerate.length } } : i));
           const parts: any[] = imageDataParts.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } }));
           if (logoBase64) parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
           const priceCopy = item.price?.trim() ? `₹${item.price.trim().replace(/^₹\s*/, '')}` : '';
@@ -2490,23 +3051,26 @@ MOOD REFERENCE: Dior haute couture campaigns, Steven Meisel for Dior, Lady Dior 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
               else if (p.text) desc = p.text;
             }
             if (url) {
-              generated.push({ themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA couture · ${theme.label}` } });
-              setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, diorImages: [...generated] } : i));
+              diorSlots[pi] = { themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA couture · ${theme.label}` } };
             }
-            await sleep(1000);
           } catch (err) {
             console.error(`Dior generation failed for ${theme.label}:`, err);
             showToast('error', `${theme.label}: ${describeError(err)}`);
+          } finally {
+            diorCompleted++;
+            const cleaned = diorSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+            setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, diorImages: cleaned, diorProgress: { current: diorCompleted, total: themesToGenerate.length } } : i));
           }
-        }
-        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, diorStatus: generated.length > 0 ? 'completed' : 'error', diorProgress: undefined } : i));
+        });
+        const finalDior = diorSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, diorStatus: finalDior.length > 0 ? 'completed' : 'error', diorProgress: undefined } : i));
       }
     } finally { setIsGeneratingDior(false); }
   };
@@ -2531,10 +3095,10 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         const modelDescription = selectedGender === 'women'
           ? applyEthnicity("a single young Indian woman, age 22-28, sun-kissed glowing features, medium-brown skin tanned warm, natural undone hair, fresh natural look", selectedEthnicity, 'women')
           : applyEthnicity("a single young Indian man, age 22-28, sun-kissed features, medium-brown skin tanned warm, tousled natural hair, easy mediterranean charm", selectedEthnicity, 'men');
-        const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
-        for (let pi = 0; pi < themesToGenerate.length; pi++) {
+        const jacquemusSlots: ({ themeId: string; themeLabel: string; view: GeneratedView } | undefined)[] = new Array(themesToGenerate.length);
+        let jacquemusCompleted = 0;
+        await runWithConcurrency(themesToGenerate.length, MAX_PARALLEL_IMAGE_GEN, async (pi) => {
           const theme = themesToGenerate[pi];
-          setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, jacquemusProgress: { current: pi, total: themesToGenerate.length } } : i));
           const parts: any[] = imageDataParts.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } }));
           if (logoBase64) parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
           const priceCopy = item.price?.trim() ? `₹${item.price.trim().replace(/^₹\s*/, '')}` : '';
@@ -2569,23 +3133,26 @@ MOOD REFERENCE: Jacquemus campaigns by Simon Porte Jacquemus, "Le Bambino" overs
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
               else if (p.text) desc = p.text;
             }
             if (url) {
-              generated.push({ themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA riviera · ${theme.label}` } });
-              setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, jacquemusImages: [...generated] } : i));
+              jacquemusSlots[pi] = { themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA riviera · ${theme.label}` } };
             }
-            await sleep(1000);
           } catch (err) {
             console.error(`Jacquemus generation failed for ${theme.label}:`, err);
             showToast('error', `${theme.label}: ${describeError(err)}`);
+          } finally {
+            jacquemusCompleted++;
+            const cleaned = jacquemusSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+            setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, jacquemusImages: cleaned, jacquemusProgress: { current: jacquemusCompleted, total: themesToGenerate.length } } : i));
           }
-        }
-        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, jacquemusStatus: generated.length > 0 ? 'completed' : 'error', jacquemusProgress: undefined } : i));
+        });
+        const finalJacquemus = jacquemusSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, jacquemusStatus: finalJacquemus.length > 0 ? 'completed' : 'error', jacquemusProgress: undefined } : i));
       }
     } finally { setIsGeneratingJacquemus(false); }
   };
@@ -2610,10 +3177,10 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         const modelDescription = selectedGender === 'women'
           ? applyEthnicity("a single young Indian woman, age 22-28, refined natural features, medium-brown skin, wind-tousled dark hair, no smile, stoic British editorial gaze", selectedEthnicity, 'women')
           : applyEthnicity("a single young Indian man, age 22-28, refined natural features, medium-brown skin, wind-tousled dark hair, stoic British editorial gaze", selectedEthnicity, 'men');
-        const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
-        for (let pi = 0; pi < themesToGenerate.length; pi++) {
+        const burberrySlots: ({ themeId: string; themeLabel: string; view: GeneratedView } | undefined)[] = new Array(themesToGenerate.length);
+        let burberryCompleted = 0;
+        await runWithConcurrency(themesToGenerate.length, MAX_PARALLEL_IMAGE_GEN, async (pi) => {
           const theme = themesToGenerate[pi];
-          setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, burberryProgress: { current: pi, total: themesToGenerate.length } } : i));
           const parts: any[] = imageDataParts.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } }));
           if (logoBase64) parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
           const priceCopy = item.price?.trim() ? `₹${item.price.trim().replace(/^₹\s*/, '')}` : '';
@@ -2646,23 +3213,26 @@ MOOD REFERENCE: Burberry campaigns by Mario Testino and Christopher Bailey era, 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
               else if (p.text) desc = p.text;
             }
             if (url) {
-              generated.push({ themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA heritage UK · ${theme.label}` } });
-              setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, burberryImages: [...generated] } : i));
+              burberrySlots[pi] = { themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA heritage UK · ${theme.label}` } };
             }
-            await sleep(1000);
           } catch (err) {
             console.error(`Burberry generation failed for ${theme.label}:`, err);
             showToast('error', `${theme.label}: ${describeError(err)}`);
+          } finally {
+            burberryCompleted++;
+            const cleaned = burberrySlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+            setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, burberryImages: cleaned, burberryProgress: { current: burberryCompleted, total: themesToGenerate.length } } : i));
           }
-        }
-        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, burberryStatus: generated.length > 0 ? 'completed' : 'error', burberryProgress: undefined } : i));
+        });
+        const finalBurberry = burberrySlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, burberryStatus: finalBurberry.length > 0 ? 'completed' : 'error', burberryProgress: undefined } : i));
       }
     } finally { setIsGeneratingBurberry(false); }
   };
@@ -2687,10 +3257,10 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         const modelDescription = selectedGender === 'women'
           ? applyEthnicity("a single young Indian woman, age 22-28, severe angular features, medium-brown skin, slick straight dark hair pulled back, dead-calm dystopian gaze", selectedEthnicity, 'women')
           : applyEthnicity("a single young Indian man, age 22-28, severe angular features, medium-brown skin, slick straight dark hair, dead-calm dystopian gaze", selectedEthnicity, 'men');
-        const generated: { themeId: string; themeLabel: string; view: GeneratedView }[] = [];
-        for (let pi = 0; pi < themesToGenerate.length; pi++) {
+        const balenciagaSlots: ({ themeId: string; themeLabel: string; view: GeneratedView } | undefined)[] = new Array(themesToGenerate.length);
+        let balenciagaCompleted = 0;
+        await runWithConcurrency(themesToGenerate.length, MAX_PARALLEL_IMAGE_GEN, async (pi) => {
           const theme = themesToGenerate[pi];
-          setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, balenciagaProgress: { current: pi, total: themesToGenerate.length } } : i));
           const parts: any[] = imageDataParts.map(img => ({ inlineData: { data: img.data, mimeType: img.mimeType } }));
           if (logoBase64) parts.push({ inlineData: { data: logoBase64, mimeType: getMimeType(logo!.file) } });
           const priceCopy = item.price?.trim() ? `₹${item.price.trim().replace(/^₹\s*/, '')}` : '';
@@ -2725,23 +3295,26 @@ MOOD REFERENCE: Balenciaga campaigns by Demna Gvasalia, "Snow" and "Mud" runways
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
               else if (p.text) desc = p.text;
             }
             if (url) {
-              generated.push({ themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA dystopia · ${theme.label}` } });
-              setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, balenciagaImages: [...generated] } : i));
+              balenciagaSlots[pi] = { themeId: theme.id, themeLabel: theme.label, view: { url, type: theme.label, description: desc || `VPPA dystopia · ${theme.label}` } };
             }
-            await sleep(1000);
           } catch (err) {
             console.error(`Balenciaga generation failed for ${theme.label}:`, err);
             showToast('error', `${theme.label}: ${describeError(err)}`);
+          } finally {
+            balenciagaCompleted++;
+            const cleaned = balenciagaSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+            setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, balenciagaImages: cleaned, balenciagaProgress: { current: balenciagaCompleted, total: themesToGenerate.length } } : i));
           }
-        }
-        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, balenciagaStatus: generated.length > 0 ? 'completed' : 'error', balenciagaProgress: undefined } : i));
+        });
+        const finalBalenciaga = balenciagaSlots.filter((g): g is NonNullable<typeof g> => Boolean(g));
+        setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, balenciagaStatus: finalBalenciaga.length > 0 ? 'completed' : 'error', balenciagaProgress: undefined } : i));
       }
     } finally { setIsGeneratingBalenciaga(false); }
   };
@@ -2749,6 +3322,32 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
   const totalViews = apparelItems.reduce((acc, i) => acc + i.views.length, 0);
   const currentViewTypes = getViewTypes(selectedGender);
   const totalExpected = apparelItems.length * currentViewTypes.length;
+
+  // Airbnb-style gallery lightbox state
+  const [galleryState, setGalleryState] = useState<{ itemId: string; startIndex: number } | null>(null);
+  const [favorites, setFavorites] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('vppa_gallery_favs') : null;
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('vppa_gallery_favs', JSON.stringify(favorites)); } catch { /* ignore quota */ }
+  }, [favorites]);
+  const toggleFavorite = (url: string) => {
+    setFavorites(prev => {
+      const next = { ...prev };
+      if (next[url]) delete next[url]; else next[url] = true;
+      return next;
+    });
+  };
+  const openGallery = (item: ApparelItem, imageUrl: string) => {
+    const gallery = buildItemGallery(item);
+    const idx = Math.max(0, gallery.findIndex(g => g.url === imageUrl));
+    setGalleryState({ itemId: item.id, startIndex: idx });
+  };
+  const activeGalleryItem = galleryState ? apparelItems.find(i => i.id === galleryState.itemId) : null;
+  const activeGalleryImages = activeGalleryItem ? buildItemGallery(activeGalleryItem) : [];
 
   return (
     <div className="min-h-screen bg-[#f8f9fb] text-gray-900 font-sans selection:bg-indigo-500/20 mesh-bg">
@@ -3050,6 +3649,20 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                       )}
                     </div>
                     <div className="flex items-center gap-1">
+                      {item.status === 'completed' && item.views.length > 0 && (
+                        <button
+                          onClick={() => downloadAllAsZip(item)}
+                          disabled={zippingItems.has(item.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {zippingItems.has(item.id) ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Archive className="w-3 h-3" />
+                          )}
+                          {zippingItems.has(item.id) ? 'Zipping...' : 'Download all'}
+                        </button>
+                      )}
                       {item.status === 'completed' && !isGenerating && (
                         <button
                           onClick={() => resetItemForRegeneration(item.id)}
@@ -3074,7 +3687,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                   <div className="px-5 py-4 flex gap-2.5 overflow-x-auto border-b border-gray-100">
                     {item.images.map((img, imgIdx) => (
                       <div key={imgIdx} className="relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border border-gray-200 group">
-                        <img src={img.preview} alt={`Ref ${imgIdx + 1}`} className="w-full h-full object-cover" />
+                        <img src={img.preview} alt={`Ref ${imgIdx + 1}`} onClick={() => openGallery(item, img.preview)} className="w-full h-full object-cover cursor-pointer" />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all" />
                         {img.label && (
                           <div className="absolute bottom-1 left-1">
@@ -3121,14 +3734,28 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                             } ${isProcessing ? 'ring-1 ring-indigo-300' : ''}`}>
                               {view ? (
                                 <>
-                                  <img src={view.url} alt={type} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2.5">
+                                  <img src={view.url} alt={type} onClick={() => openGallery(item, view.url)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" />
+                                  {regeneratingViews.has(`${item.id}:${idx}`) && (
+                                    <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center gap-1.5">
+                                      <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+                                      <span className="text-[9px] font-medium text-indigo-600">Regenerating...</span>
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2.5 gap-1.5">
                                     <button
                                       onClick={() => downloadImage(view.url, `VPPA_${item.id}_${type.replace(/\s+/g, '_')}.png`)}
                                       className="w-full py-1.5 rounded-lg bg-white text-gray-700 text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 transition-colors shadow-sm"
                                     >
                                       <Download className="w-3 h-3" />
                                       Save
+                                    </button>
+                                    <button
+                                      onClick={() => regenerateView(item.id, idx)}
+                                      disabled={regeneratingViews.has(`${item.id}:${idx}`) || isGenerating}
+                                      className="w-full py-1.5 rounded-lg bg-indigo-500 text-white text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-indigo-600 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                      <RefreshCw className={`w-3 h-3 ${regeneratingViews.has(`${item.id}:${idx}`) ? 'animate-spin' : ''}`} />
+                                      Regenerate
                                     </button>
                                   </div>
                                 </>
@@ -3168,7 +3795,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         </AnimatePresence>
 
         {/* Brand Campaigns Section */}
-        {apparelItems.length > 0 && (
+        {SHOW_BRAND_CAMPAIGNS && apparelItems.length > 0 && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -3577,7 +4204,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                                   } ${isCurrent ? 'ring-1 ring-fuchsia-300' : ''}`}>
                                     {generated ? (
                                       <>
-                                        <img src={generated.view.url} alt={scene.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <img src={generated.view.url} alt={scene.label} onClick={() => openGallery(item, generated.view.url)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
                                           <button
                                             onClick={() => downloadImage(generated.view.url, `VPPA_Campaign_${scene.id}_${item.id}.png`)}
@@ -3747,7 +4374,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                                   } ${isCurrent ? 'ring-1 ring-amber-300' : ''}`} style={{ backgroundColor: generated ? 'transparent' : palette.backgroundHex }}>
                                     {generated ? (
                                       <>
-                                        <img src={generated.view.url} alt={palette.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <img src={generated.view.url} alt={palette.label} onClick={() => openGallery(item, generated.view.url)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
                                           <button
                                             onClick={() => downloadImage(generated.view.url, `VPPA_Press_${palette.id}_${item.id}.png`)}
@@ -3915,7 +4542,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                                   } ${isCurrent ? 'ring-1 ring-gray-400' : ''}`}>
                                     {generated ? (
                                       <>
-                                        <img src={generated.view.url} alt={setting.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <img src={generated.view.url} alt={setting.label} onClick={() => openGallery(item, generated.view.url)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
                                           <button
                                             onClick={() => downloadImage(generated.view.url, `VPPA_Editorial_${setting.id}_${item.id}.png`)}
@@ -4098,7 +4725,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                                   } ${isCurrent ? 'ring-1 ring-amber-400' : ''}`}>
                                     {generated ? (
                                       <>
-                                        <img src={generated.view.url} alt={palette.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <img src={generated.view.url} alt={palette.label} onClick={() => openGallery(item, generated.view.url)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
                                           <button
                                             onClick={() => downloadImage(generated.view.url, `VPPA_Heritage_${palette.id}_${item.id}.png`)}
@@ -4258,7 +4885,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                                   } ${isCurrent ? 'ring-1 ring-orange-400' : ''}`}>
                                     {generated ? (
                                       <>
-                                        <img src={generated.view.url} alt={theme.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <img src={generated.view.url} alt={theme.label} onClick={() => openGallery(item, generated.view.url)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
                                           <button
                                             onClick={() => downloadImage(generated.view.url, `VPPA_Atelier_${theme.id}_${item.id}.png`)}
@@ -4416,7 +5043,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                                   } ${isCurrent ? 'ring-1 ring-emerald-400' : ''}`}>
                                     {generated ? (
                                       <>
-                                        <img src={generated.view.url} alt={theme.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <img src={generated.view.url} alt={theme.label} onClick={() => openGallery(item, generated.view.url)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
                                           <button
                                             onClick={() => downloadImage(generated.view.url, `VPPA_Quiet_${theme.id}_${item.id}.png`)}
@@ -4574,7 +5201,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                                   } ${isCurrent ? 'ring-1 ring-gray-700' : ''}`}>
                                     {generated ? (
                                       <>
-                                        <img src={generated.view.url} alt={theme.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <img src={generated.view.url} alt={theme.label} onClick={() => openGallery(item, generated.view.url)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
                                           <button
                                             onClick={() => downloadImage(generated.view.url, `VPPA_Noir_${theme.id}_${item.id}.png`)}
@@ -4692,7 +5319,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                                   <div className={`aspect-square rounded-xl overflow-hidden relative border transition-all ${generated ? 'border-gray-200 hover:border-gray-300' : 'border-gray-100 bg-gray-50/50'} ${isCurrent ? 'ring-1 ring-lime-400' : ''}`}>
                                     {generated ? (
                                       <>
-                                        <img src={generated.view.url} alt={theme.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <img src={generated.view.url} alt={theme.label} onClick={() => openGallery(item, generated.view.url)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
                                           <button onClick={() => downloadImage(generated.view.url, `VPPA_Conceptual_${theme.id}_${item.id}.png`)} className="w-full py-1.5 rounded-lg bg-white text-gray-700 text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 shadow-sm"><Download className="w-3 h-3" />Save</button>
                                         </div>
@@ -4791,7 +5418,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                                   <div className={`aspect-square rounded-xl overflow-hidden relative border transition-all ${generated ? 'border-gray-200 hover:border-gray-300' : 'border-gray-100 bg-gray-50/50'} ${isCurrent ? 'ring-1 ring-rose-300' : ''}`}>
                                     {generated ? (
                                       <>
-                                        <img src={generated.view.url} alt={theme.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <img src={generated.view.url} alt={theme.label} onClick={() => openGallery(item, generated.view.url)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
                                           <button onClick={() => downloadImage(generated.view.url, `VPPA_Couture_${theme.id}_${item.id}.png`)} className="w-full py-1.5 rounded-lg bg-white text-gray-700 text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 shadow-sm"><Download className="w-3 h-3" />Save</button>
                                         </div>
@@ -4890,7 +5517,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                                   <div className={`aspect-square rounded-xl overflow-hidden relative border transition-all ${generated ? 'border-gray-200 hover:border-gray-300' : 'border-gray-100 bg-gray-50/50'} ${isCurrent ? 'ring-1 ring-yellow-400' : ''}`}>
                                     {generated ? (
                                       <>
-                                        <img src={generated.view.url} alt={theme.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <img src={generated.view.url} alt={theme.label} onClick={() => openGallery(item, generated.view.url)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
                                           <button onClick={() => downloadImage(generated.view.url, `VPPA_Riviera_${theme.id}_${item.id}.png`)} className="w-full py-1.5 rounded-lg bg-white text-gray-700 text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 shadow-sm"><Download className="w-3 h-3" />Save</button>
                                         </div>
@@ -4989,7 +5616,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                                   <div className={`aspect-square rounded-xl overflow-hidden relative border transition-all ${generated ? 'border-gray-200 hover:border-gray-300' : 'border-gray-100 bg-gray-50/50'} ${isCurrent ? 'ring-1 ring-stone-500' : ''}`}>
                                     {generated ? (
                                       <>
-                                        <img src={generated.view.url} alt={theme.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <img src={generated.view.url} alt={theme.label} onClick={() => openGallery(item, generated.view.url)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
                                           <button onClick={() => downloadImage(generated.view.url, `VPPA_Heritage_UK_${theme.id}_${item.id}.png`)} className="w-full py-1.5 rounded-lg bg-white text-gray-700 text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 shadow-sm"><Download className="w-3 h-3" />Save</button>
                                         </div>
@@ -5088,7 +5715,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                                   <div className={`aspect-square rounded-xl overflow-hidden relative border transition-all ${generated ? 'border-gray-200 hover:border-gray-300' : 'border-gray-100 bg-gray-50/50'} ${isCurrent ? 'ring-1 ring-zinc-700' : ''}`}>
                                     {generated ? (
                                       <>
-                                        <img src={generated.view.url} alt={theme.label} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <img src={generated.view.url} alt={theme.label} onClick={() => openGallery(item, generated.view.url)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-2">
                                           <button onClick={() => downloadImage(generated.view.url, `VPPA_Dystopia_${theme.id}_${item.id}.png`)} className="w-full py-1.5 rounded-lg bg-white text-gray-700 text-[9px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 shadow-sm"><Download className="w-3 h-3" />Save</button>
                                         </div>
@@ -5117,6 +5744,21 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
           </motion.section>
         )}
       </main>
+
+      <AnimatePresence>
+        {galleryState && activeGalleryItem && activeGalleryImages.length > 0 && (
+          <GalleryLightbox
+            images={activeGalleryImages}
+            startIndex={galleryState.startIndex}
+            itemId={activeGalleryItem.id}
+            favorites={favorites}
+            onToggleFavorite={toggleFavorite}
+            onDownload={downloadImage}
+            onClose={() => setGalleryState(null)}
+            onNotify={(msg) => showToast('info', msg)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {toast && (
