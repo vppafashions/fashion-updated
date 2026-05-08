@@ -1572,7 +1572,7 @@ Also provide a one-sentence product description.`,
         model: IMAGE_MODEL,
         contents: { parts },
         config: {
-          imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize }
+          imageConfig: { aspectRatio: "1:1", imageSize: viewIdx === 3 ? '1K' : selectedImageSize }
         }
       });
 
@@ -1791,7 +1791,7 @@ Also provide a one-sentence product description.`,
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize }
+                imageConfig: { aspectRatio: "1:1", imageSize: v === 3 ? '1K' : selectedImageSize }
               }
             });
 
