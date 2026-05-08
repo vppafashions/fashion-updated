@@ -1170,6 +1170,16 @@ function StudioApp() {
   const [selectedStyle, setSelectedStyle] = useState(BACKGROUND_STYLES[0]);
   const [selectedGender, setSelectedGender] = useState<Gender>('women');
   const [selectedEthnicity, setSelectedEthnicity] = useState<Ethnicity>('indian');
+  const [selectedImageSize, setSelectedImageSize] = useState<'0.5K' | '1K'>(() => {
+    if (typeof window === 'undefined') return '0.5K';
+    const saved = window.localStorage.getItem('vppa-image-size');
+    return saved === '1K' ? '1K' : '0.5K';
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('vppa-image-size', selectedImageSize);
+    }
+  }, [selectedImageSize]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingCampaigns, setIsGeneratingCampaigns] = useState(false);
   const [isGeneratingPress, setIsGeneratingPress] = useState(false);
@@ -1562,7 +1572,7 @@ Also provide a one-sentence product description.`,
         model: IMAGE_MODEL,
         contents: { parts },
         config: {
-          imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' }
+          imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize }
         }
       });
 
@@ -1781,7 +1791,7 @@ Also provide a one-sentence product description.`,
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' }
+                imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize }
               }
             });
 
@@ -2059,7 +2069,7 @@ Reproduce the EXACT apparel from the provided reference images on the model. Out
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' }
+                imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize }
               }
             });
 
@@ -2205,7 +2215,7 @@ Reproduce the EXACT apparel from the provided reference images with full materia
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' }
+                imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize }
               }
             });
 
@@ -2329,7 +2339,7 @@ MOOD REFERENCE: Zara SS/AW Studio campaigns, Massimo Dutti lookbook, Arket ensem
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' }
+                imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize }
               }
             });
 
@@ -2479,7 +2489,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' }
+                imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize }
               }
             });
 
@@ -2609,7 +2619,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             const response = await callImageGenWithRetry({
               model: IMAGE_MODEL,
               contents: { parts },
-              config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } }
+              config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } }
             });
 
             let url = '';
@@ -2744,7 +2754,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             const response = await callImageGenWithRetry({
               model: IMAGE_MODEL,
               contents: { parts },
-              config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } }
+              config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } }
             });
 
             let url = '';
@@ -2876,7 +2886,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             const response = await callImageGenWithRetry({
               model: IMAGE_MODEL,
               contents: { parts },
-              config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } }
+              config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } }
             });
 
             let url = '';
@@ -2970,7 +2980,7 @@ MOOD REFERENCE: Prada SS24 / Miu Miu Pre-Spring campaigns, Steven Meisel for Pra
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
@@ -3051,7 +3061,7 @@ MOOD REFERENCE: Dior haute couture campaigns, Steven Meisel for Dior, Lady Dior 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
@@ -3133,7 +3143,7 @@ MOOD REFERENCE: Jacquemus campaigns by Simon Porte Jacquemus, "Le Bambino" overs
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
@@ -3213,7 +3223,7 @@ MOOD REFERENCE: Burberry campaigns by Mario Testino and Christopher Bailey era, 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
@@ -3295,7 +3305,7 @@ MOOD REFERENCE: Balenciaga campaigns by Demna Gvasalia, "Snow" and "Mud" runways
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: '0.5K' } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
@@ -3540,6 +3550,32 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
               </div>
               <p className="text-[9px] text-gray-400 mt-1.5 max-w-[200px] leading-relaxed">
                 {ETHNICITY_PROFILES.find(p => p.id === selectedEthnicity)?.description}
+              </p>
+            </div>
+
+            {/* Resolution Toggle */}
+            <div>
+              <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-3 block">
+                Resolution
+              </label>
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                {(['0.5K', '1K'] as const).map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => setSelectedImageSize(size)}
+                    className={`px-4 py-2.5 text-xs font-semibold transition-all duration-200 ${
+                      selectedImageSize === size
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-white text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                    }`}
+                    title={size === '0.5K' ? '512x512 - faster, ~$0.047/image' : '1024x1024 - sharper, ~$0.08/image'}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[9px] text-gray-400 mt-1.5 leading-relaxed">
+                {selectedImageSize === '0.5K' ? '512x512, faster' : '1024x1024, sharper'}
               </p>
             </div>
 
