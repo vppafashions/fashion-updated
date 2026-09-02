@@ -3306,7 +3306,8 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
       const modelDescription = selectedGender === 'women'
         ? applyEthnicity('a single young Indian woman, age 22-28, expressive editorial presence, polished hair and natural makeup', selectedEthnicity, 'women')
         : applyEthnicity('a single young Indian man, age 22-28, expressive editorial presence, polished grooming and confident stance', selectedEthnicity, 'men');
-      parts.push({ text: `Create a premium ${selectedAspectRatio} social-media fashion campaign for VPPA Fashions. STYLE: ${style.direction}. MODEL: ${modelDescription}. The selected women/men model and ethnicity must be respected. Reproduce the exact apparel from the supplied references with faithful color, material, print, and fit. Use one model only. Add the supplied VPPA logo subtly in a corner, never on the garment. No unrelated text, watermark, or extra products.` });
+      const priceCopy = item.price?.trim() ? ` Add a single discreet price line "₹${item.price.trim().replace(/^₹\s*/, '')}" directly below the VPPA logo.` : '';
+      parts.push({ text: `Create a premium ${selectedAspectRatio} social-media fashion campaign for VPPA Fashions. STYLE: ${style.direction}. MODEL: ${modelDescription}. The selected women/men model and ethnicity must be respected. Reproduce the exact apparel from the supplied references with faithful color, material, print, and fit. Use one model only. Add the supplied VPPA logo subtly in a corner, never on the garment.${priceCopy} No unrelated text, watermark, or extra products.` });
       const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
       let url = '';
       let description = '';
@@ -5720,6 +5721,17 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                       <div>
                         <p className="text-sm font-medium text-gray-700">Expanded Style Library</p>
                         <p className="text-[10px] text-gray-400">Uses {selectedGender === 'women' ? 'Women' : 'Men'} model · {ETHNICITY_PROFILES.find((profile) => profile.id === selectedEthnicity)?.shortLabel} · {selectedAspectRatio}</p>
+                      </div>
+                      <div className="ml-auto flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100">
+                        <span className="text-xs font-semibold text-gray-400">₹</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={item.price || ''}
+                          onChange={(e) => setApparelItems((items) => items.map((candidate) => candidate.id === item.id ? { ...candidate, price: e.target.value.replace(/[^\d.,]/g, '') } : candidate))}
+                          placeholder="Price"
+                          className="w-20 bg-transparent text-xs text-gray-700 placeholder:text-gray-300 focus:outline-none"
+                        />
                       </div>
                     </div>
                     <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
