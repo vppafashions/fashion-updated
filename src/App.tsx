@@ -1145,6 +1145,7 @@ function StudioApp() {
   const [isGeneratingBalenciaga, setIsGeneratingBalenciaga] = useState(false);
   const [isGeneratingExtraStyle, setIsGeneratingExtraStyle] = useState(false);
   const [campaignTab, setCampaignTab] = useState<'scenes' | 'press' | 'editorial' | 'heritage' | 'hermes' | 'bottega' | 'saintlaurent' | 'prada' | 'dior' | 'jacquemus' | 'burberry' | 'balenciaga' | 'extra'>('scenes');
+  const [selectedExtraStyleId, setSelectedExtraStyleId] = useState('');
   const [toast, setToast] = useState<{ kind: 'error' | 'info'; message: string } | null>(null);
   const [regeneratingViews, setRegeneratingViews] = useState<Set<string>>(new Set());
   const [zippingItems, setZippingItems] = useState<Set<string>>(new Set());
@@ -4123,16 +4124,22 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                 Dystopian
                 <span className="text-[9px] text-gray-400 font-normal">Balenciaga</span>
               </button>
-              <button
-                onClick={() => setCampaignTab('extra')}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
-                  campaignTab === 'extra' ? 'bg-white shadow-sm border border-gray-200 text-gray-900' : 'text-gray-400 hover:text-gray-600'
-                }`}
+            </div>
+
+            <div className="flex items-center gap-2 mb-6">
+              <label htmlFor="style-library" className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Style Library</label>
+              <select
+                id="style-library"
+                value={campaignTab === 'extra' ? selectedExtraStyleId : ''}
+                onChange={(e) => {
+                  setSelectedExtraStyleId(e.target.value);
+                  if (e.target.value) setCampaignTab('extra');
+                }}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 focus:outline-none focus:border-indigo-400"
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                More Styles
-                <span className="text-[9px] text-gray-400 font-normal">8 new</span>
-              </button>
+                <option value="">Choose an additional style…</option>
+                {EXTRA_STYLES.map((style) => <option key={style.id} value={style.id}>{style.label} — {style.subtitle}</option>)}
+              </select>
             </div>
 
             {campaignTab === 'scenes' && (
@@ -5716,7 +5723,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                       </div>
                     </div>
                     <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                      {EXTRA_STYLES.map((style) => {
+                      {EXTRA_STYLES.filter((style) => style.id === selectedExtraStyleId).map((style) => {
                         const generated = item.extraStyleImages?.find((image) => image.styleId === style.id);
                         return (
                           <div key={style.id} className="rounded-xl border border-gray-200 overflow-hidden bg-white">
