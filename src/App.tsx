@@ -9,7 +9,7 @@ import { Upload, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, Sparkle
 import { motion, AnimatePresence } from 'motion/react';
 import JSZip from 'jszip';
 
-const SHOW_BRAND_CAMPAIGNS = false;
+const SHOW_BRAND_CAMPAIGNS = true;
 
 // Initialize Gemini API for analysis + image generation.
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
@@ -21,7 +21,7 @@ const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 const IMAGE_MODEL_PRIMARY = 'gemini-3.1-flash-lite-image';
 const IMAGE_MODEL_FALLBACK = 'gemini-2.5-flash-image';
 const IMAGE_MODEL = IMAGE_MODEL_PRIMARY;
-const ANALYSIS_MODEL = 'gemini-3-flash-preview';
+const ANALYSIS_MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3-flash-preview'] as const;
 
 // Once primary hits hard-quota 429 (limit:0), skip it for the rest of the session.
 let imageModelDegraded = false;
@@ -1554,10 +1554,19 @@ ${isPrinted ? '9' : '7'}. SCALE: Approximate size category
 Be EXTREMELY precise about the prints/graphics. Every detail matters -- the image generation model must reproduce the EXACT prints on the correct sides.`
       });
 
-      const response = await callWithRetry(() => genAI.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: { parts }
-      }));
+      let response: any;
+      let lastError: any;
+      for (const model of ANALYSIS_MODELS) {
+        try {
+          response = await callWithRetry(() => genAI.models.generateContent({ model, contents: { parts } }));
+          break;
+        } catch (error) {
+          lastError = error;
+          console.warn(`[analysis] ${model} failed; trying the next model.`, error);
+        }
+      }
+
+      if (!response) throw lastError;
 
       return response.candidates?.[0]?.content?.parts?.[0]?.text || '';
     };
