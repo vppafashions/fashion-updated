@@ -1073,6 +1073,28 @@ function StudioApp() {
       window.localStorage.setItem('vppa-image-size', selectedImageSize);
     }
   }, [selectedImageSize]);
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDefaultLogo = async () => {
+      try {
+        const response = await fetch('/vppalogo.svg');
+        if (!response.ok) return;
+        const blob = await response.blob();
+        if (!cancelled) {
+          setLogo({
+            file: new File([blob], 'vppalogo.svg', { type: 'image/svg+xml' }),
+            preview: '/vppalogo.svg'
+          });
+        }
+      } catch {
+        // The optional logo upload remains available if the bundled asset is unavailable.
+      }
+    };
+
+    void loadDefaultLogo();
+    return () => { cancelled = true; };
+  }, []);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingCampaigns, setIsGeneratingCampaigns] = useState(false);
   const [isGeneratingPress, setIsGeneratingPress] = useState(false);
