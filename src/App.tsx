@@ -171,6 +171,7 @@ interface ApparelItem {
   balenciagaImages?: { themeId: string; themeLabel: string; view: GeneratedView }[];
   balenciagaStatus?: 'idle' | 'generating' | 'completed' | 'error';
   balenciagaProgress?: { current: number; total: number };
+  extraStyleImages?: { styleId: string; styleLabel: string; view: GeneratedView }[];
 }
 
 interface EditorialSetting {
@@ -545,6 +546,14 @@ const CAMPAIGN_SCENES: CampaignScene[] = [
 const MAX_PHOTOS_PER_ITEM = 5;
 
 type Gender = 'women' | 'men';
+type SocialAspectRatio = '1:1' | '4:5' | '9:16' | '16:9';
+
+const SOCIAL_FORMATS: { id: SocialAspectRatio; label: string; detail: string }[] = [
+  { id: '1:1', label: 'Square', detail: 'Instagram feed' },
+  { id: '4:5', label: 'Portrait', detail: 'Instagram feed' },
+  { id: '9:16', label: 'Vertical', detail: 'Stories & Reels' },
+  { id: '16:9', label: 'Landscape', detail: 'YouTube & X' },
+];
 
 type Ethnicity =
   | 'indian'
@@ -707,6 +716,17 @@ const BACKGROUND_STYLES = [
   { id: 'minimalist-cream', name: 'Minimalist Cream', prompt: 'a calm, minimalist cream luxury studio background' }
 ];
 
+const EXTRA_STYLES = [
+  { id: 'japanese-minimal', label: 'Japanese Minimal', subtitle: 'Jil Sander / AURALEE', accent: 'stone', direction: 'quiet Japanese minimalism, precise tailoring, pale architectural space, restrained styling and soft natural daylight' },
+  { id: 'streetwear', label: 'Streetwear Editorial', subtitle: 'Off-White / A-COLD-WALL*', accent: 'orange', direction: 'high-energy contemporary streetwear editorial, graphic urban concrete, directional flash, candid movement and confident attitude' },
+  { id: 'sport-luxe', label: 'Sport Luxe', subtitle: 'Adidas Originals / Nike ACG', accent: 'blue', direction: 'premium sport-luxe campaign, sculptural performance-inspired set, clean technical lighting, athletic movement and polished styling' },
+  { id: 'denim-americana', label: 'Denim Americana', subtitle: 'Levi’s / Ralph Lauren', accent: 'red', direction: 'sun-faded Americana fashion editorial, authentic denim texture, open road or ranch setting, warm film grain and relaxed confidence' },
+  { id: 'resort-glamour', label: 'Resort Glamour', subtitle: 'Versace / Dolce & Gabbana', accent: 'amber', direction: 'Mediterranean resort glamour, saturated sun, dramatic stone architecture, rich color and cinematic holiday confidence' },
+  { id: 'avant-garde', label: 'Avant-Garde', subtitle: 'Comme des Garçons / Rick Owens', accent: 'zinc', direction: 'avant-garde fashion art direction, monumental sculptural set, unusual silhouette framing, deep shadows and gallery-level composition' },
+  { id: 'scandinavian', label: 'Scandinavian Clean', subtitle: 'Ganni / Acne Studios', accent: 'pink', direction: 'bright Scandinavian fashion campaign, playful clean color, modern Nordic interiors, candid poise and crisp daylight' },
+  { id: 'indian-contemporary', label: 'Indian Contemporary', subtitle: 'Modern Mumbai Editorial', accent: 'violet', direction: 'contemporary Indian fashion editorial, modern Mumbai architecture, refined local craft cues, humid luminous daylight and elevated styling' },
+] as const;
+
 // Aggregate every generated image for an apparel item into one flat array.
 // Order matches the way sections render top-to-bottom in the UI.
 function buildItemGallery(item: ApparelItem): GalleryImage[] {
@@ -731,6 +751,7 @@ function buildItemGallery(item: ApparelItem): GalleryImage[] {
     { list: item.jacquemusImages?.map(c => ({ view: c.view, label: c.themeLabel })), section: 'Riviera' },
     { list: item.burberryImages?.map(c => ({ view: c.view, label: c.themeLabel })), section: 'Heritage UK' },
     { list: item.balenciagaImages?.map(c => ({ view: c.view, label: c.themeLabel })), section: 'Dystopia' },
+    { list: item.extraStyleImages?.map(c => ({ view: c.view, label: c.styleLabel })), section: 'Expanded Styles' },
   ];
   buckets.forEach(b => {
     b.list?.forEach(entry => gallery.push({ url: entry.view.url, label: entry.label, section: b.section }));
@@ -1063,6 +1084,7 @@ function StudioApp() {
   const [selectedStyle, setSelectedStyle] = useState(BACKGROUND_STYLES[0]);
   const [selectedGender, setSelectedGender] = useState<Gender>('women');
   const [selectedEthnicity, setSelectedEthnicity] = useState<Ethnicity>('indian');
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState<SocialAspectRatio>('1:1');
   const [selectedImageSize, setSelectedImageSize] = useState<'1K'>(() => {
     if (typeof window === 'undefined') return '1K';
     const saved = window.localStorage.getItem('vppa-image-size');
@@ -1121,7 +1143,8 @@ function StudioApp() {
   const [isGeneratingJacquemus, setIsGeneratingJacquemus] = useState(false);
   const [isGeneratingBurberry, setIsGeneratingBurberry] = useState(false);
   const [isGeneratingBalenciaga, setIsGeneratingBalenciaga] = useState(false);
-  const [campaignTab, setCampaignTab] = useState<'scenes' | 'press' | 'editorial' | 'heritage' | 'hermes' | 'bottega' | 'saintlaurent' | 'prada' | 'dior' | 'jacquemus' | 'burberry' | 'balenciaga'>('scenes');
+  const [isGeneratingExtraStyle, setIsGeneratingExtraStyle] = useState(false);
+  const [campaignTab, setCampaignTab] = useState<'scenes' | 'press' | 'editorial' | 'heritage' | 'hermes' | 'bottega' | 'saintlaurent' | 'prada' | 'dior' | 'jacquemus' | 'burberry' | 'balenciaga' | 'extra'>('scenes');
   const [toast, setToast] = useState<{ kind: 'error' | 'info'; message: string } | null>(null);
   const [regeneratingViews, setRegeneratingViews] = useState<Set<string>>(new Set());
   const [zippingItems, setZippingItems] = useState<Set<string>>(new Set());
@@ -1501,7 +1524,7 @@ Also provide a one-sentence product description.`,
         model: IMAGE_MODEL,
         contents: { parts },
         config: {
-          imageConfig: { aspectRatio: "1:1", imageSize: viewIdx === 3 ? '1K' : selectedImageSize }
+          imageConfig: { aspectRatio: selectedAspectRatio, imageSize: viewIdx === 3 ? '1K' : selectedImageSize }
         }
       });
 
@@ -1729,7 +1752,7 @@ Also provide a one-sentence product description.`,
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: v === 3 ? '1K' : selectedImageSize }
+                imageConfig: { aspectRatio: selectedAspectRatio, imageSize: v === 3 ? '1K' : selectedImageSize }
               }
             });
 
@@ -2007,7 +2030,7 @@ Reproduce the EXACT apparel from the provided reference images on the model. Out
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize }
+                imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize }
               }
             });
 
@@ -2153,7 +2176,7 @@ Reproduce the EXACT apparel from the provided reference images with full materia
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize }
+                imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize }
               }
             });
 
@@ -2277,7 +2300,7 @@ MOOD REFERENCE: Zara SS/AW Studio campaigns, Massimo Dutti lookbook, Arket ensem
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize }
+                imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize }
               }
             });
 
@@ -2427,7 +2450,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
               model: IMAGE_MODEL,
               contents: { parts },
               config: {
-                imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize }
+                imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize }
               }
             });
 
@@ -2557,7 +2580,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             const response = await callImageGenWithRetry({
               model: IMAGE_MODEL,
               contents: { parts },
-              config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } }
+              config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } }
             });
 
             let url = '';
@@ -2692,7 +2715,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             const response = await callImageGenWithRetry({
               model: IMAGE_MODEL,
               contents: { parts },
-              config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } }
+              config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } }
             });
 
             let url = '';
@@ -2824,7 +2847,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             const response = await callImageGenWithRetry({
               model: IMAGE_MODEL,
               contents: { parts },
-              config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } }
+              config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } }
             });
 
             let url = '';
@@ -2918,7 +2941,7 @@ MOOD REFERENCE: Prada SS24 / Miu Miu Pre-Spring campaigns, Steven Meisel for Pra
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
@@ -2999,7 +3022,7 @@ MOOD REFERENCE: Dior haute couture campaigns, Steven Meisel for Dior, Lady Dior 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
@@ -3081,7 +3104,7 @@ MOOD REFERENCE: Jacquemus campaigns by Simon Porte Jacquemus, "Le Bambino" overs
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
@@ -3161,7 +3184,7 @@ MOOD REFERENCE: Burberry campaigns by Mario Testino and Christopher Bailey era, 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
@@ -3243,7 +3266,7 @@ MOOD REFERENCE: Balenciaga campaigns by Demna Gvasalia, "Snow" and "Mud" runways
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
           parts.push({ text: prompt });
           try {
-            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: "1:1", imageSize: selectedImageSize } } });
+            const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
             for (const p of response.candidates?.[0]?.content?.parts || []) {
               if (p.inlineData) url = `data:image/png;base64,${p.inlineData.data}`;
@@ -3265,6 +3288,43 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         setApparelItems(prev => prev.map(i => i.id === item.id ? { ...i, balenciagaStatus: finalBalenciaga.length > 0 ? 'completed' : 'error', balenciagaProgress: undefined } : i));
       }
     } finally { setIsGeneratingBalenciaga(false); }
+  };
+
+  const generateExtraStyleImage = async (itemId: string, styleId: string) => {
+    const item = apparelItems.find((candidate) => candidate.id === itemId);
+    const style = EXTRA_STYLES.find((candidate) => candidate.id === styleId);
+    if (!item || !style) return;
+
+    setIsGeneratingExtraStyle(true);
+    try {
+      const parts: any[] = [];
+      for (const image of item.images) {
+        parts.push({ inlineData: { data: await fileToBase64(image.file), mimeType: getMimeType(image.file) } });
+      }
+      if (logo) parts.push({ inlineData: { data: await fileToBase64(logo.file), mimeType: getMimeType(logo.file) } });
+      const modelDescription = selectedGender === 'women'
+        ? applyEthnicity('a single young Indian woman, age 22-28, expressive editorial presence, polished hair and natural makeup', selectedEthnicity, 'women')
+        : applyEthnicity('a single young Indian man, age 22-28, expressive editorial presence, polished grooming and confident stance', selectedEthnicity, 'men');
+      parts.push({ text: `Create a premium ${selectedAspectRatio} social-media fashion campaign for VPPA Fashions. STYLE: ${style.direction}. MODEL: ${modelDescription}. The selected women/men model and ethnicity must be respected. Reproduce the exact apparel from the supplied references with faithful color, material, print, and fit. Use one model only. Add the supplied VPPA logo subtly in a corner, never on the garment. No unrelated text, watermark, or extra products.` });
+      const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
+      let url = '';
+      let description = '';
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) url = `data:image/png;base64,${part.inlineData.data}`;
+        else if (part.text) description = part.text;
+      }
+      if (url) {
+        setApparelItems((items) => items.map((candidate) => candidate.id === itemId ? {
+          ...candidate,
+          extraStyleImages: [...(candidate.extraStyleImages || []).filter((image) => image.styleId !== style.id), { styleId: style.id, styleLabel: style.label, view: { url, type: style.label, description: description || `VPPA ${style.label}` } }]
+        } : candidate));
+      }
+    } catch (error) {
+      console.error(`Expanded style generation failed for ${style.label}:`, error);
+      showToast('error', `${style.label}: ${describeError(error)}`);
+    } finally {
+      setIsGeneratingExtraStyle(false);
+    }
   };
 
   const totalViews = apparelItems.reduce((acc, i) => acc + i.views.length, 0);
@@ -3516,6 +3576,21 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                   1024x1024, sharper
                 </p>
               </div>
+
+            {/* Generate */}
+            <div>
+              <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-3 block">
+                Social format
+              </label>
+              <select
+                value={selectedAspectRatio}
+                onChange={(e) => setSelectedAspectRatio(e.target.value as SocialAspectRatio)}
+                className="px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700 focus:outline-none focus:border-indigo-400"
+              >
+                {SOCIAL_FORMATS.map((format) => <option key={format.id} value={format.id}>{format.label} · {format.id}</option>)}
+              </select>
+              <p className="text-[9px] text-gray-400 mt-1.5">{SOCIAL_FORMATS.find((format) => format.id === selectedAspectRatio)?.detail}</p>
+            </div>
 
             {/* Generate */}
             <div className="lg:w-auto w-full">
@@ -3796,6 +3871,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                   {campaignTab === 'jacquemus' && 'Jacquemus riviera -- sun-drenched south of France with surreal oversized props, joyful pastel summer'}
                   {campaignTab === 'burberry' && 'Burberry British heritage -- foggy moors, rainy cobblestones, trench coat heritage, atmospheric British countryside'}
                   {campaignTab === 'balenciaga' && 'Balenciaga dystopian -- brutalist post-apocalyptic, oversized silhouettes, cinematic dystopia'}
+                  {campaignTab === 'extra' && 'Eight additional campaign directions, all using the selected model, ethnicity, and social format'}
                 </p>
               </div>
               {(() => {
@@ -3915,6 +3991,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                     </button>
                   );
                 }
+                if (campaignTab === 'extra') return null;
                 const totalSelected = apparelItems.reduce((sum, i) => sum + (i.selectedBalenciagaThemes?.length || 0), 0);
                 return (
                   <button onClick={() => generateBalenciagaImages()} disabled={totalSelected === 0 || isGeneratingBalenciaga || isGenerating} className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-zinc-700 to-zinc-900 hover:from-zinc-800 hover:to-black text-white shadow-md shadow-zinc-900/30">
@@ -4045,6 +4122,16 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                 <Zap className="w-3.5 h-3.5" />
                 Dystopian
                 <span className="text-[9px] text-gray-400 font-normal">Balenciaga</span>
+              </button>
+              <button
+                onClick={() => setCampaignTab('extra')}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+                  campaignTab === 'extra' ? 'bg-white shadow-sm border border-gray-200 text-gray-900' : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                More Styles
+                <span className="text-[9px] text-gray-400 font-normal">8 new</span>
               </button>
             </div>
 
@@ -5615,6 +5702,39 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                 );
               })}
             </div>
+            )}
+
+            {campaignTab === 'extra' && (
+              <div className="space-y-6">
+                {apparelItems.map((item) => (
+                  <div key={`extra-${item.id}`} className="glass rounded-2xl overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+                      <img src={item.images[0].preview} alt="ref" className="w-11 h-11 rounded-lg object-cover border border-gray-200" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Expanded Style Library</p>
+                        <p className="text-[10px] text-gray-400">Uses {selectedGender === 'women' ? 'Women' : 'Men'} model · {ETHNICITY_PROFILES.find((profile) => profile.id === selectedEthnicity)?.shortLabel} · {selectedAspectRatio}</p>
+                      </div>
+                    </div>
+                    <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {EXTRA_STYLES.map((style) => {
+                        const generated = item.extraStyleImages?.find((image) => image.styleId === style.id);
+                        return (
+                          <div key={style.id} className="rounded-xl border border-gray-200 overflow-hidden bg-white">
+                            {generated ? <img src={generated.view.url} alt={style.label} onClick={() => openGallery(item, generated.view.url)} className="w-full aspect-square object-cover cursor-pointer" /> : <div className="aspect-square bg-gray-50 flex items-center justify-center"><Sparkles className="w-5 h-5 text-gray-300" /></div>}
+                            <div className="p-2.5">
+                              <p className="text-[10px] font-semibold text-gray-700 truncate">{style.label}</p>
+                              <p className="text-[9px] text-gray-400 truncate">{style.subtitle}</p>
+                              <button onClick={() => generateExtraStyleImage(item.id, style.id)} disabled={isGeneratingExtraStyle || isGenerating} className="mt-2 w-full py-1.5 rounded-lg bg-gray-900 text-white text-[9px] font-semibold disabled:opacity-30">
+                                {isGeneratingExtraStyle ? 'Creating…' : generated ? 'Regenerate' : 'Generate'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
 
             {campaignTab === 'balenciaga' && (
