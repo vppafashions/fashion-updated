@@ -1068,6 +1068,21 @@ function StudioApp() {
     const saved = window.localStorage.getItem('vppa-image-size');
     return '1K';
   });
+  const rasterizeSvgToPng = (source: string, name: string): Promise<File> => new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth || 512;
+      canvas.height = image.naturalHeight || 512;
+      canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (blob) resolve(new File([blob], name, { type: 'image/png' }));
+        else reject(new Error('Could not convert the SVG logo to PNG.'));
+      }, 'image/png');
+    };
+    image.onerror = () => reject(new Error('Could not load the SVG logo.'));
+    image.src = source;
+  });
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('vppa-image-size', selectedImageSize);
@@ -1078,12 +1093,10 @@ function StudioApp() {
 
     const loadDefaultLogo = async () => {
       try {
-        const response = await fetch('/vppalogo.svg');
-        if (!response.ok) return;
-        const blob = await response.blob();
+        const file = await rasterizeSvgToPng('/vppalogo.svg', 'vppalogo.png');
         if (!cancelled) {
           setLogo({
-            file: new File([blob], 'vppalogo.svg', { type: 'image/svg+xml' }),
+            file,
             preview: '/vppalogo.svg'
           });
         }
@@ -1137,14 +1150,19 @@ function StudioApp() {
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [pendingPrintedFront, setPendingPrintedFront] = useState<ReferenceImage | null>(null);
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogo({ file, preview: reader.result as string });
-      };
-      reader.readAsDataURL(file as Blob);
+      let logoFile = file;
+      if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
+        const objectUrl = URL.createObjectURL(file);
+        try {
+          logoFile = await rasterizeSvgToPng(objectUrl, `${file.name.replace(/\.svg$/i, '')}.png`);
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+      }
+      setLogo({ file: logoFile, preview: await readFileAsPreview(logoFile) });
     }
   };
 
