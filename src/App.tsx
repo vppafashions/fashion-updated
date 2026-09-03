@@ -1087,6 +1087,7 @@ function StudioApp() {
   const [selectedEthnicity, setSelectedEthnicity] = useState<Ethnicity>('indian');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<SocialAspectRatio>('1:1');
   const [useLayeredWordmark, setUseLayeredWordmark] = useState(false);
+  const [topDownCustomText, setTopDownCustomText] = useState('EVERYDAY');
   const [selectedImageSize, setSelectedImageSize] = useState<'1K'>(() => {
     if (typeof window === 'undefined') return '1K';
     const saved = window.localStorage.getItem('vppa-image-size');
@@ -3321,8 +3322,9 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         ? applyEthnicity('a single young Indian woman, age 22-28, expressive editorial presence, polished hair and natural makeup', selectedEthnicity, 'women')
         : applyEthnicity('a single young Indian man, age 22-28, expressive editorial presence, polished grooming and confident stance', selectedEthnicity, 'men');
       const priceCopy = item.price?.trim() ? ` Add a single discreet price line "₹${item.price.trim().replace(/^₹\s*/, '')}" directly below the VPPA logo.` : '';
+      const posterHeadline = topDownCustomText.trim().toUpperCase() || 'EVERYDAY';
       const posterCopy = style.template === 'topdown-product-poster'
-        ? ` TOP-DOWN POSTER TEMPLATE: Use a true overhead camera looking down at the model, head tilted down, with the complete outfit visible from cap to shoes. Compose as a tall premium fashion ad. Set a huge elegant serif headline “VPPA / EVERYDAY” behind the model, with the model cleanly occluding the letters. Put “VPPA FASHIONS” and the supplied VPPA logo in the top-right, a small season marker in the top-left, a short product story and 3–4 small circular feature icons down the left side, “PRICE” with the provided price in the lower-right, and a dark “SHOP NOW →” call-to-action below it. Use only VPPA wording; never mention, imitate, or show another brand. Typography must be crisp, intentional, and legible.`
+        ? ` TOP-DOWN POSTER TEMPLATE: Use a true overhead camera looking down at the model, head tilted down, with the complete outfit visible from cap to shoes. Compose as a tall premium fashion ad. Set a huge elegant serif headline “VPPA / ${posterHeadline}” behind the model, with the model cleanly occluding the letters. Put “VPPA FASHIONS” and the supplied VPPA logo in the top-right, a small season marker in the top-left, a short product story and 3–4 small circular feature icons down the left side, “PRICE” with the provided price in the lower-right, and a dark “SHOP NOW →” call-to-action below it. Use only VPPA wording; never mention, imitate, or show another brand. Typography must be crisp, intentional, and legible.`
         : '';
       parts.push({ text: withLayeredWordmark(`Create a premium ${selectedAspectRatio} social-media fashion campaign for VPPA Fashions. STYLE: ${style.direction}. MODEL: ${modelDescription}. The selected women/men model and ethnicity must be respected. Reproduce the exact apparel from the supplied references with faithful color, material, print, and fit. Use one model only. Add the supplied VPPA logo subtly in a corner, never on the garment.${priceCopy}${posterCopy} No unrelated text, watermark, or extra products.`) });
       const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
@@ -4184,6 +4186,23 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                 {EXTRA_STYLES.map((style) => <option key={style.id} value={style.id}>{style.label} — {style.subtitle}</option>)}
               </select>
             </div>
+
+            {campaignTab === 'extra' && selectedExtraStyleId === 'topdown-product-poster' && (
+              <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5">
+                <span className="text-xs font-semibold text-gray-700">VPPA /</span>
+                <label htmlFor="topdown-custom-text" className="sr-only">Text after VPPA</label>
+                <input
+                  id="topdown-custom-text"
+                  type="text"
+                  maxLength={32}
+                  value={topDownCustomText}
+                  onChange={(e) => setTopDownCustomText(e.target.value)}
+                  placeholder="YOUR TEXT"
+                  className="w-52 bg-transparent text-xs font-medium uppercase tracking-wide text-gray-700 placeholder:text-gray-300 focus:outline-none"
+                />
+                <span className="text-[10px] text-gray-400">Headline text for this poster</span>
+              </div>
+            )}
 
             {campaignTab === 'scenes' && (
             <div className="space-y-6">
