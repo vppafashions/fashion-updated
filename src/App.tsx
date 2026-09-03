@@ -717,6 +717,7 @@ const BACKGROUND_STYLES = [
 ];
 
 const EXTRA_STYLES = [
+  { id: 'topdown-product-poster', label: 'Top-Down Product Poster', subtitle: 'VPPA campaign template', accent: 'ink', direction: 'a refined vertical top-down product campaign poster: an overhead full-body editorial photograph on a warm off-white seamless ground, oversized high-contrast fashion headline behind the model, a disciplined magazine grid, fine rules, generous negative space, and soft directional shadows', template: 'topdown-product-poster' },
   { id: 'japanese-minimal', label: 'Japanese Minimal', subtitle: 'Jil Sander / AURALEE', accent: 'stone', direction: 'quiet Japanese minimalism, precise tailoring, pale architectural space, restrained styling and soft natural daylight' },
   { id: 'streetwear', label: 'Streetwear Editorial', subtitle: 'Off-White / A-COLD-WALL*', accent: 'orange', direction: 'high-energy contemporary streetwear editorial, graphic urban concrete, directional flash, candid movement and confident attitude' },
   { id: 'sport-luxe', label: 'Sport Luxe', subtitle: 'Adidas Originals / Nike ACG', accent: 'blue', direction: 'premium sport-luxe campaign, sculptural performance-inspired set, clean technical lighting, athletic movement and polished styling' },
@@ -3320,7 +3321,10 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         ? applyEthnicity('a single young Indian woman, age 22-28, expressive editorial presence, polished hair and natural makeup', selectedEthnicity, 'women')
         : applyEthnicity('a single young Indian man, age 22-28, expressive editorial presence, polished grooming and confident stance', selectedEthnicity, 'men');
       const priceCopy = item.price?.trim() ? ` Add a single discreet price line "₹${item.price.trim().replace(/^₹\s*/, '')}" directly below the VPPA logo.` : '';
-      parts.push({ text: withLayeredWordmark(`Create a premium ${selectedAspectRatio} social-media fashion campaign for VPPA Fashions. STYLE: ${style.direction}. MODEL: ${modelDescription}. The selected women/men model and ethnicity must be respected. Reproduce the exact apparel from the supplied references with faithful color, material, print, and fit. Use one model only. Add the supplied VPPA logo subtly in a corner, never on the garment.${priceCopy} No unrelated text, watermark, or extra products.`) });
+      const posterCopy = style.template === 'topdown-product-poster'
+        ? ` TOP-DOWN POSTER TEMPLATE: Use a true overhead camera looking down at the model, head tilted down, with the complete outfit visible from cap to shoes. Compose as a tall premium fashion ad. Set a huge elegant serif headline “VPPA / EVERYDAY” behind the model, with the model cleanly occluding the letters. Put “VPPA FASHIONS” and the supplied VPPA logo in the top-right, a small season marker in the top-left, a short product story and 3–4 small circular feature icons down the left side, “PRICE” with the provided price in the lower-right, and a dark “SHOP NOW →” call-to-action below it. Use only VPPA wording; never mention, imitate, or show another brand. Typography must be crisp, intentional, and legible.`
+        : '';
+      parts.push({ text: withLayeredWordmark(`Create a premium ${selectedAspectRatio} social-media fashion campaign for VPPA Fashions. STYLE: ${style.direction}. MODEL: ${modelDescription}. The selected women/men model and ethnicity must be respected. Reproduce the exact apparel from the supplied references with faithful color, material, print, and fit. Use one model only. Add the supplied VPPA logo subtly in a corner, never on the garment.${priceCopy}${posterCopy} No unrelated text, watermark, or extra products.`) });
       const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
       let url = '';
       let description = '';
