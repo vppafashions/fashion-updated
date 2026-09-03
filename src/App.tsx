@@ -1168,7 +1168,7 @@ function StudioApp() {
   };
 
   const withLayeredWordmark = (prompt: string) => useLayeredWordmark
-    ? `${prompt}\n\nLAYERED VPPA WORDMARK: Place the exact text “VPPA” as a large stylised typographic layer between the model and the background. The letters must sit behind the model’s body but in front of the background, with natural occlusion where the model crosses them. Make it editorial, legible, and integrated with the palette; it is not a corner logo, a watermark, or text pasted over the model.`
+    ? `${prompt}\n\nLAYERED VPPA WORDMARK — NON-NEGOTIABLE DEPTH ORDER: (1) background, (2) large stylised “VPPA” typography, (3) the model as a fully opaque foreground cutout. The model must completely cover the letters wherever their shapes intersect. NO letter pixels, transparency, texture, shadow, or outlines may appear over the model’s skin, hair, face, clothing, hands, or limbs. If a letter crosses the silhouette, erase that portion of the letter behind the silhouette. Keep the VPPA text visible only in the negative space around the model. This is not a translucent overlay, watermark, or text printed on the garment.`
     : prompt;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
