@@ -3899,7 +3899,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                   {campaignTab === 'jacquemus' && 'Jacquemus riviera -- sun-drenched south of France with surreal oversized props, joyful pastel summer'}
                   {campaignTab === 'burberry' && 'Burberry British heritage -- foggy moors, rainy cobblestones, trench coat heritage, atmospheric British countryside'}
                   {campaignTab === 'balenciaga' && 'Balenciaga dystopian -- brutalist post-apocalyptic, oversized silhouettes, cinematic dystopia'}
-                  {campaignTab === 'extra' && 'Eight additional campaign directions, all using the selected model, ethnicity, and social format'}
+                  {campaignTab === 'extra' && (selectedExtraStyleId === 'topdown-product-poster' ? 'VPPA top-down product poster -- editorial grid, logo, price, product details, and shop-now treatment' : 'Additional campaign directions, all using the selected model, ethnicity, and social format')}
                 </p>
               </div>
               {(() => {
@@ -4037,6 +4037,16 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
 
             {/* Campaign Type Tabs */}
             <div className="flex items-center gap-2 mb-6 flex-wrap">
+              <button
+                onClick={() => { setSelectedExtraStyleId('topdown-product-poster'); setCampaignTab('extra'); }}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+                  campaignTab === 'extra' && selectedExtraStyleId === 'topdown-product-poster' ? 'bg-white shadow-sm border border-gray-200 text-gray-900' : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                Top-Down Poster
+                <span className="text-[9px] text-gray-400 font-normal">VPPA</span>
+              </button>
               <button
                 onClick={() => setCampaignTab('scenes')}
                 className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
