@@ -1088,6 +1088,8 @@ function StudioApp() {
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<SocialAspectRatio>('1:1');
   const [useLayeredWordmark, setUseLayeredWordmark] = useState(false);
   const [topDownCustomText, setTopDownCustomText] = useState('EVERYDAY');
+  const [topDownDescription, setTopDownDescription] = useState('A signature piece for the modern everyday wardrobe.');
+  const [topDownFeatures, setTopDownFeatures] = useState(['Premium Fabric', 'Hand-Finished', 'Versatile Fit']);
   const [selectedImageSize, setSelectedImageSize] = useState<'1K'>(() => {
     if (typeof window === 'undefined') return '1K';
     const saved = window.localStorage.getItem('vppa-image-size');
@@ -3323,8 +3325,11 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         : applyEthnicity('a single young Indian man, age 22-28, expressive editorial presence, polished grooming and confident stance', selectedEthnicity, 'men');
       const priceCopy = item.price?.trim() ? ` Add a single discreet price line "₹${item.price.trim().replace(/^₹\s*/, '')}" directly below the VPPA logo.` : '';
       const posterHeadline = topDownCustomText.trim().toUpperCase() || 'EVERYDAY';
+      const posterDescription = topDownDescription.trim() || 'A signature piece for the modern everyday wardrobe.';
+      const posterFeatures = topDownFeatures.map((feature) => feature.trim()).filter(Boolean).slice(0, 3);
+      const posterFeatureCopy = posterFeatures.length ? posterFeatures.map((feature, index) => `${index + 1}. “${feature}”`).join(' ') : '1. “Premium Fabric” 2. “Hand-Finished” 3. “Versatile Fit”';
       const posterCopy = style.template === 'topdown-product-poster'
-        ? ` TOP-DOWN POSTER TEMPLATE: Use a true overhead camera looking down at the model, head tilted down, with the complete outfit visible from cap to shoes. Compose as a tall premium fashion ad. Set a huge elegant serif headline “VPPA / ${posterHeadline}” behind the model, with the model cleanly occluding the letters. Put “VPPA FASHIONS” and the supplied VPPA logo in the top-right, a small season marker in the top-left, a short product story and 3–4 small circular feature icons down the left side, “PRICE” with the provided price in the lower-right, and a dark “SHOP NOW →” call-to-action below it. Use only VPPA wording; never mention, imitate, or show another brand. Typography must be crisp, intentional, and legible.`
+        ? ` TOP-DOWN POSTER TEMPLATE: Use a true overhead camera looking down at the model, head tilted down, with the complete outfit visible from cap to shoes. Compose as a tall premium fashion ad. Set a huge elegant serif headline “VPPA ${posterHeadline}” behind the model, with the model cleanly occluding the letters. Never place a slash, forward slash, or separator between VPPA and ${posterHeadline}. Use this exact description in the left-side product story: “${posterDescription}”. Add these exact three feature labels beside small circular line icons down the left side: ${posterFeatureCopy}. Put “VPPA FASHIONS” and the supplied VPPA logo in the top-right, a small season marker in the top-left, “PRICE” with the provided price in the lower-right, and a dark “SHOP NOW →” call-to-action below it. Do not invent, alter, or replace any supplied copy. Use only VPPA wording; never mention, imitate, or show another brand. Typography must be crisp, intentional, and legible.`
         : '';
       parts.push({ text: withLayeredWordmark(`Create a premium ${selectedAspectRatio} social-media fashion campaign for VPPA Fashions. STYLE: ${style.direction}. MODEL: ${modelDescription}. The selected women/men model and ethnicity must be respected. Reproduce the exact apparel from the supplied references with faithful color, material, print, and fit. Use one model only. Add the supplied VPPA logo subtly in a corner, never on the garment.${priceCopy}${posterCopy} No unrelated text, watermark, or extra products.`) });
       const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
@@ -4188,19 +4193,48 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
             </div>
 
             {campaignTab === 'extra' && selectedExtraStyleId === 'topdown-product-poster' && (
-              <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5">
-                <span className="text-xs font-semibold text-gray-700">VPPA /</span>
-                <label htmlFor="topdown-custom-text" className="sr-only">Text after VPPA</label>
-                <input
-                  id="topdown-custom-text"
-                  type="text"
-                  maxLength={32}
-                  value={topDownCustomText}
-                  onChange={(e) => setTopDownCustomText(e.target.value)}
-                  placeholder="YOUR TEXT"
-                  className="w-52 bg-transparent text-xs font-medium uppercase tracking-wide text-gray-700 placeholder:text-gray-300 focus:outline-none"
-                />
-                <span className="text-[10px] text-gray-400">Headline text for this poster</span>
+              <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-gray-700">VPPA</span>
+                  <label htmlFor="topdown-custom-text" className="sr-only">Text after VPPA</label>
+                  <input
+                    id="topdown-custom-text"
+                    type="text"
+                    maxLength={32}
+                    value={topDownCustomText}
+                    onChange={(e) => setTopDownCustomText(e.target.value)}
+                    placeholder="YOUR TEXT"
+                    className="w-52 bg-transparent text-xs font-medium uppercase tracking-wide text-gray-700 placeholder:text-gray-300 focus:outline-none"
+                  />
+                  <span className="text-[10px] text-gray-400">Headline text</span>
+                </div>
+                <div>
+                  <label htmlFor="topdown-description" className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-gray-400">Product description</label>
+                  <textarea
+                    id="topdown-description"
+                    rows={2}
+                    maxLength={220}
+                    value={topDownDescription}
+                    onChange={(e) => setTopDownDescription(e.target.value)}
+                    className="w-full resize-none rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-700 focus:outline-none focus:border-indigo-400"
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Feature labels</p>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {topDownFeatures.map((feature, index) => (
+                      <input
+                        key={index}
+                        type="text"
+                        maxLength={40}
+                        value={feature}
+                        onChange={(e) => setTopDownFeatures((features) => features.map((current, currentIndex) => currentIndex === index ? e.target.value : current))}
+                        placeholder={`Feature ${index + 1}`}
+                        className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-700 placeholder:text-gray-300 focus:outline-none focus:border-indigo-400"
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 
