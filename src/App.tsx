@@ -1085,6 +1085,7 @@ function StudioApp() {
   const [selectedGender, setSelectedGender] = useState<Gender>('women');
   const [selectedEthnicity, setSelectedEthnicity] = useState<Ethnicity>('indian');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<SocialAspectRatio>('1:1');
+  const [useLayeredWordmark, setUseLayeredWordmark] = useState(false);
   const [selectedImageSize, setSelectedImageSize] = useState<'1K'>(() => {
     if (typeof window === 'undefined') return '1K';
     const saved = window.localStorage.getItem('vppa-image-size');
@@ -1165,6 +1166,10 @@ function StudioApp() {
     if (/SAFETY|blocked|safety/i.test(msg)) return 'Prompt was blocked by safety filters. Try a different theme.';
     return msg.slice(0, 200) || 'Image generation failed. Check browser console for details.';
   };
+
+  const withLayeredWordmark = (prompt: string) => useLayeredWordmark
+    ? `${prompt}\n\nLAYERED VPPA WORDMARK: Place the exact text “VPPA” as a large stylised typographic layer between the model and the background. The letters must sit behind the model’s body but in front of the background, with natural occlusion where the model crosses them. Make it editorial, legible, and integrated with the palette; it is not a corner logo, a watermark, or text pasted over the model.`
+    : prompt;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addPhotoInputRef = useRef<HTMLInputElement>(null);
@@ -1521,6 +1526,10 @@ CRITICAL RULES:
 Also provide a one-sentence product description.`,
       });
 
+      if (isModelShot && useLayeredWordmark) {
+        parts.push({ text: withLayeredWordmark('Keep the requested layered wordmark treatment.') });
+      }
+
       const response = await callImageGenWithRetry({
         model: IMAGE_MODEL,
         contents: { parts },
@@ -1747,6 +1756,10 @@ CRITICAL RULES:
 
 Also provide a one-sentence product description.`,
           });
+
+          if (isModelShot && useLayeredWordmark) {
+            parts.push({ text: withLayeredWordmark('Keep the requested layered wordmark treatment.') });
+          }
 
           try {
             const response = await callImageGenWithRetry({
@@ -2024,7 +2037,7 @@ STRICT TECH RULES:
 
 Reproduce the EXACT apparel from the provided reference images on the model. Output one image only.`;
 
-          parts.push({ text: campaignPrompt });
+          parts.push({ text: withLayeredWordmark(campaignPrompt) });
 
           try {
             const response = await callImageGenWithRetry({
@@ -2170,7 +2183,7 @@ TECH RULES:
 
 Reproduce the EXACT apparel from the provided reference images with full material and print fidelity. Output one image only.`;
 
-          parts.push({ text: pressPrompt });
+          parts.push({ text: withLayeredWordmark(pressPrompt) });
 
           try {
             const response = await callImageGenWithRetry({
@@ -2294,7 +2307,7 @@ STRICT RULES: No text beyond the tiny VPPA mark${priceCopy ? ' and the price lin
 
 MOOD REFERENCE: Zara SS/AW Studio campaigns, Massimo Dutti lookbook, Arket ensemble imagery, COS editorial. Quiet luxury. Effortless.`;
 
-          parts.push({ text: editorialPrompt });
+          parts.push({ text: withLayeredWordmark(editorialPrompt) });
 
           try {
             const response = await callImageGenWithRetry({
@@ -2444,7 +2457,7 @@ MOOD REFERENCE: Louis Vuitton monogram campaigns, Gucci Aria editorial, Burberry
 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
 
-          parts.push({ text: heritagePrompt });
+          parts.push({ text: withLayeredWordmark(heritagePrompt) });
 
           try {
             const response = await callImageGenWithRetry({
@@ -2575,7 +2588,7 @@ MOOD REFERENCE: Hermes silk scarves, Linda Merad illustrations, vintage atelier 
 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
 
-          parts.push({ text: hermesPrompt });
+          parts.push({ text: withLayeredWordmark(hermesPrompt) });
 
           try {
             const response = await callImageGenWithRetry({
@@ -2710,7 +2723,7 @@ MOOD REFERENCE: Bottega Veneta "Craft is our Language" campaign by Jack Davison,
 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
 
-          parts.push({ text: bottegaPrompt });
+          parts.push({ text: withLayeredWordmark(bottegaPrompt) });
 
           try {
             const response = await callImageGenWithRetry({
@@ -2842,7 +2855,7 @@ MOOD REFERENCE: Saint Laurent campaigns by Hedi Slimane, Anthony Vaccarello edit
 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
 
-          parts.push({ text: ysPrompt });
+          parts.push({ text: withLayeredWordmark(ysPrompt) });
 
           try {
             const response = await callImageGenWithRetry({
@@ -2940,7 +2953,7 @@ TECH: Photorealistic, sharp medium-format clarity, micro-grain, f/8 deep DOF, sl
 MOOD REFERENCE: Prada SS24 / Miu Miu Pre-Spring campaigns, Steven Meisel for Prada, Raf Simons era institutional art-direction.
 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
-          parts.push({ text: prompt });
+          parts.push({ text: withLayeredWordmark(prompt) });
           try {
             const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
@@ -3021,7 +3034,7 @@ TECH: Photorealistic medium-format quality, painterly post grade, f/2.8 with sof
 MOOD REFERENCE: Dior haute couture campaigns, Steven Meisel for Dior, Lady Dior campaigns, classical Renaissance portraiture.
 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
-          parts.push({ text: prompt });
+          parts.push({ text: withLayeredWordmark(prompt) });
           try {
             const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
@@ -3103,7 +3116,7 @@ TECH: Photorealistic 35mm film quality, slight warm grain, f/4 with creamy soft 
 MOOD REFERENCE: Jacquemus campaigns by Simon Porte Jacquemus, "Le Bambino" oversize prop campaigns, south of France lifestyle editorial.
 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
-          parts.push({ text: prompt });
+          parts.push({ text: withLayeredWordmark(prompt) });
           try {
             const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
@@ -3183,7 +3196,7 @@ TECH: Photorealistic, slight cool British grade, fine 35mm grain, f/4 medium-for
 MOOD REFERENCE: Burberry campaigns by Mario Testino and Christopher Bailey era, "Brit" Burberry heritage, cinematic British countryside editorials.
 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
-          parts.push({ text: prompt });
+          parts.push({ text: withLayeredWordmark(prompt) });
           try {
             const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
@@ -3265,7 +3278,7 @@ TECH: Photorealistic cinematic CCTV-aesthetic quality, deep grain, f/2.8-f/4 wit
 MOOD REFERENCE: Balenciaga campaigns by Demna Gvasalia, "Snow" and "Mud" runways, post-apocalyptic editorial work, Vetements early campaigns.
 
 Reproduce the EXACT apparel from the provided reference images. Output one image only.`;
-          parts.push({ text: prompt });
+          parts.push({ text: withLayeredWordmark(prompt) });
           try {
             const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
             let url = ''; let desc = '';
@@ -3307,7 +3320,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         ? applyEthnicity('a single young Indian woman, age 22-28, expressive editorial presence, polished hair and natural makeup', selectedEthnicity, 'women')
         : applyEthnicity('a single young Indian man, age 22-28, expressive editorial presence, polished grooming and confident stance', selectedEthnicity, 'men');
       const priceCopy = item.price?.trim() ? ` Add a single discreet price line "₹${item.price.trim().replace(/^₹\s*/, '')}" directly below the VPPA logo.` : '';
-      parts.push({ text: `Create a premium ${selectedAspectRatio} social-media fashion campaign for VPPA Fashions. STYLE: ${style.direction}. MODEL: ${modelDescription}. The selected women/men model and ethnicity must be respected. Reproduce the exact apparel from the supplied references with faithful color, material, print, and fit. Use one model only. Add the supplied VPPA logo subtly in a corner, never on the garment.${priceCopy} No unrelated text, watermark, or extra products.` });
+      parts.push({ text: withLayeredWordmark(`Create a premium ${selectedAspectRatio} social-media fashion campaign for VPPA Fashions. STYLE: ${style.direction}. MODEL: ${modelDescription}. The selected women/men model and ethnicity must be respected. Reproduce the exact apparel from the supplied references with faithful color, material, print, and fit. Use one model only. Add the supplied VPPA logo subtly in a corner, never on the garment.${priceCopy} No unrelated text, watermark, or extra products.`) });
       const response = await callImageGenWithRetry({ model: IMAGE_MODEL, contents: { parts }, config: { imageConfig: { aspectRatio: selectedAspectRatio, imageSize: selectedImageSize } } });
       let url = '';
       let description = '';
@@ -3593,6 +3606,15 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
               </select>
               <p className="text-[9px] text-gray-400 mt-1.5">{SOCIAL_FORMATS.find((format) => format.id === selectedAspectRatio)?.detail}</p>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setUseLayeredWordmark((enabled) => !enabled)}
+              className={`rounded-xl border px-3 py-2.5 text-left transition-all ${useLayeredWordmark ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'}`}
+            >
+              <span className="block text-[11px] font-semibold">Layered VPPA wordmark</span>
+              <span className="block mt-0.5 text-[9px] opacity-70">{useLayeredWordmark ? 'Behind model · on' : 'Between model & backdrop'}</span>
+            </button>
 
             {/* Generate */}
             <div className="lg:w-auto w-full">
