@@ -3872,7 +3872,7 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
         </AnimatePresence>
 
         {/* Brand Campaigns Section */}
-        {SHOW_BRAND_CAMPAIGNS && apparelItems.length > 0 && (
+        {SHOW_BRAND_CAMPAIGNS && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -4028,6 +4028,12 @@ Reproduce the EXACT apparel from the provided reference images. Output one image
                 );
               })()}
             </div>
+
+            {apparelItems.length === 0 && (
+              <div className="mb-6 rounded-xl border border-dashed border-gray-200 bg-white/60 px-4 py-3 text-xs text-gray-400">
+                Upload an apparel reference above, then choose a campaign template and generate it.
+              </div>
+            )}
 
             {/* Campaign Type Tabs */}
             <div className="flex items-center gap-2 mb-6 flex-wrap">
